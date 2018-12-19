@@ -117,9 +117,9 @@ function wp_cache_get( $key, $group = 'default', $force = false ) {
  *
  * @return  bool|mixed           Array of cached values, keys in the format $group:$key. Non-existent keys false
  */
-function wp_cache_get_multi( $groups ) {
+function wp_cache_get_multi( $groups, $unserialize = true ) {
 	global $wp_object_cache;
-	return $wp_object_cache->get_multi( $groups );
+	return $wp_object_cache->get_multi( $groups, $unserialize );
 }
 
 /**
@@ -255,6 +255,8 @@ class WP_Object_Cache {
 	 * @var array
 	 */
 	public $cache = array();
+
+	private $to_unserialize = array();
 
 	/**
 	 * List of global groups.
@@ -480,8 +482,15 @@ class WP_Object_Cache {
 		list( $key, $redis_key ) = $this->build_key( $_key, $group );
 
 		if ( ! $force && isset( $this->cache[ $group ][ $key ] ) ) {
-			// TODO: Unserialize shenanigans.
-			return is_object( $this->cache[ $group ][ $key ] ) ? clone $this->cache[ $group ][ $key ] : $this->cache[ $group ][ $key ];
+			$value = $this->cache[ $group ][ $key ];
+
+			if ( isset( $this->to_unserialize[ $redis_key ] ) ) {
+				unset( $this->to_unserialize[ $redis_key ] );
+				$value = unserialize( $value );
+				$this->cache[ $group ][ $key ] = $value;
+			}
+
+			return is_object( $value ) ? clone $value : $value;
 		}
 
 		if ( in_array( $group, $this->no_redis_groups ) || ! $this->can_redis() ) {
@@ -511,7 +520,7 @@ class WP_Object_Cache {
 	 * @param   array                           $groups  Array of groups and keys to retrieve
 	 * @return  bool|mixed                               Array of cached values, keys in the format $group:$key. Non-existent keys null.
 	 */
-	public function get_multi( $groups ) {
+	public function get_multi( $groups, $unserialize = true ) {
 		if ( empty( $groups ) || ! is_array( $groups ) ) {
 			return false;
 		}
@@ -556,7 +565,14 @@ class WP_Object_Cache {
 			}
 
 			list( $group, $key ) = $map[ $redis_key ];
-			$this->cache[ $group ][ $key ] = $cache[ $group ][ $key ] = unserialize( $value );
+
+			if ( ! $unserialize ) {
+				$this->to_unserialize[ $redis_key ] = true;
+			} else {
+				$value = unserialize( $value );
+			}
+
+			$this->cache[ $group ][ $key ] = $cache[ $group ][ $key ] = $value;
 		}
 
 		return $cache;
