@@ -70,6 +70,8 @@ class Test_Object_Cache extends WP_UnitTestCase {
 	}
 
 	public function test_preload() {
+		$this->markTestSkipped( 'Not implemented' );
+
 		$this->assertTrue( wp_cache_set( 'hit', '1' ) );
 		$this->assertTrue( wp_cache_set( 'hit', '2', 'group2' ) );
 
