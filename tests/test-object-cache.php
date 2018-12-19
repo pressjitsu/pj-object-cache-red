@@ -41,6 +41,24 @@ class Test_Object_Cache extends WP_UnitTestCase {
 		$this->assertCount( 2, $this->redis_spy->_get( 'incrBy' ) );
 	}
 
+	public function test_multi_get() {
+		wp_cache_set( 'hit', '1' );
+		wp_cache_set( 'hit', '2', 'group2' );
+
+		global $wp_object_cache;
+		$wp_object_cache->cache = array();
+
+		$result = wp_cache_get_multi( array(
+			'group2' => array( 'hit' ),
+			'default' => array( 'hit' ),
+		) );
+
+		var_dump( $result );
+
+		$this->assertCount( 0, $this->redis_spy->_get( 'get' ) );
+		$this->assertCount( 1, $this->redis_spy->_get( 'mget' ) );
+	}
+
 	public function test_preload() {
 		$this->assertTrue( wp_cache_set( 'hit', '1' ) );
 		$this->assertTrue( wp_cache_set( 'hit', '2', 'group2' ) );
