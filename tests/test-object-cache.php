@@ -53,7 +53,17 @@ class Test_Object_Cache extends WP_UnitTestCase {
 			'default' => array( 'hit' ),
 		) );
 
-		var_dump( $result );
+		$this->assertEquals( array(
+			'group2' => array(
+				'hit' => '1',
+			),
+			'default' => array(
+				'hit' => '2',
+			)
+		), $result );
+
+		wp_cache_get( 'hit' );
+		wp_cache_get( 'hit', 'group2' );
 
 		$this->assertCount( 0, $this->redis_spy->_get( 'get' ) );
 		$this->assertCount( 1, $this->redis_spy->_get( 'mget' ) );
