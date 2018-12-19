@@ -328,11 +328,6 @@ class WP_Object_Cache {
 		if ( defined( 'WP_REDIS_BACKEND_DB' ) && WP_REDIS_BACKEND_DB ) {
 			$redis['database'] = WP_REDIS_BACKEND_DB;
 		}
-		if ( ( defined( 'WP_REDIS_SERIALIZER' ) ) ) {
-			$redis['serializer'] =  WP_REDIS_SERIALIZER;
-		} else {
-			$redis['serializer'] =  Redis::SERIALIZER_PHP;
-		}
 
 		// Use Redis PECL library.
 		try {
