@@ -407,6 +407,10 @@ class WP_Object_Cache {
 				continue;
 			}
 
+			if ( in_array( $group, $this->no_redis_groups ) ) {
+				continue;
+			}
+
 			$_keys = array_keys( $_keys );
 			$keys[ $group ] = $_keys;
 		}
@@ -475,7 +479,7 @@ class WP_Object_Cache {
 			}
 		}
 
-		return $this->set( $key, $value, $group, $expiration );
+		return $this->set( $_key, $value, $group, $expiration );
 	}
 
 	/**
@@ -528,7 +532,7 @@ class WP_Object_Cache {
 	public function get( $_key, $group = 'default', $force = false ) {
 		list( $key, $redis_key ) = $this->build_key( $_key, $group );
 
-		$this->to_preload[ $group ][ $key ] = true;
+		$this->to_preload[ $group ][ $_key ] = true;
 
 		if ( ! $force && isset( $this->cache[ $group ][ $key ] ) ) {
 			$value = $this->cache[ $group ][ $key ];
@@ -583,7 +587,7 @@ class WP_Object_Cache {
 			if ( in_array( $group, $this->no_redis_groups ) || ! $this->can_redis() ) {
 				foreach ( $keys as $_key ) {
 					list( $key, $redis_key ) = $this->build_key( $_key, $group );
-					$cache[ $group ][ $key ] = $this->get( $key, $group );
+					$cache[ $group ][ $key ] = $this->get( $_key, $group );
 				}
 
 				continue;
