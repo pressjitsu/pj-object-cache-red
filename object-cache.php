@@ -719,8 +719,14 @@ class WP_Object_Cache {
 			$group = 'default';
 		}
 
+		static $global_groups;
+
+		if ( is_null( $global_groups ) ) {
+			$global_groups = array_flip( $this->global_groups );
+		}
+
 		$prefix = '';
-		if ( false === array_search( $group, $this->global_groups ) ) {
+		if ( isset( $this->global_groups[ $group ] ) ) {
 			$prefix = $this->blog_prefix;
 		}
 
