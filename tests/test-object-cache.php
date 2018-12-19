@@ -70,27 +70,41 @@ class Test_Object_Cache extends WP_UnitTestCase {
 	}
 
 	public function test_preload() {
-		$this->markTestSkipped( 'Not implemented' );
-
-		$this->assertTrue( wp_cache_set( 'hit', '1' ) );
-		$this->assertTrue( wp_cache_set( 'hit', '2', 'group2' ) );
+		wp_cache_set( 'hit', '1' );
+		wp_cache_set( 'hit', '2', 'group2' );
 
 		$this->assertEquals( '1', wp_cache_get( 'hit' ) );
 		$this->assertEquals( '2', wp_cache_get( 'hit', 'group2' ) );
 
-		$this->assertCount( 2, $this->redis_spy->_get( 'get' ) );
-
 		$this->redis_spy->_reset();
 
-		// $wp_object_cache->save_preloads();
-		// $wp_object_cache->flush_internal_cache();
-		// $wp_object_cache->preload();
+		global $wp_object_cache;
 
+		$wp_object_cache->save_preloads( 'hash' );
+		$wp_object_cache->cache = array();
+		$wp_object_cache->preload( 'hash' );
+
+		$this->assertCount( 1, $this->redis_spy->_get( 'get' ) );
 		$this->assertCount( 1, $this->redis_spy->_get( 'mget' ) );
 
 		$this->assertEquals( '1', wp_cache_get( 'hit' ) );
 		$this->assertEquals( '2', wp_cache_get( 'hit', 'group2' ) );
 
-		$this->assertCount( 0, $this->redis_spy->_get( 'get' ) );
+		$result = wp_cache_get_multi( array(
+			'group2' => array( 'hit' ),
+			'default' => array( 'hit' ),
+		) );
+
+		$this->assertEquals( array(
+			'group2' => array(
+				'hit' => '2',
+			),
+			'default' => array(
+				'hit' => '1',
+			)
+		), $result );
+
+		$this->assertCount( 1, $this->redis_spy->_get( 'mget' ) );
+		$this->assertCount( 1, $this->redis_spy->_get( 'get' ) );
 	}
 }
