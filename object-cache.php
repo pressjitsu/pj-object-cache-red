@@ -391,12 +391,12 @@ class WP_Object_Cache {
 	 * @param   int    $expiration     The expiration time, defaults to 0.
 	 * @return  bool                   Returns TRUE on success or FALSE on failure.
 	 */
-	public function add( $key, $value, $group, $expiration = 0 ) {
+	public function add( $_key, $value, $group, $expiration = 0 ) {
 		if ( wp_suspend_cache_addition() ) {
 			return false;
 		}
 
-		list( $key, $redis_key ) = $this->build_key( $key, $group );
+		list( $key, $redis_key ) = $this->build_key( $_key, $group );
 
 		if ( isset( $this->cache[ $group ], $this->cache[ $group ][ $key ] ) ) {
 			return false;
@@ -417,8 +417,8 @@ class WP_Object_Cache {
 	 * @param   int    $expiration     The expiration time, defaults to 0.
 	 * @return  bool                   Returns TRUE on success or FALSE on failure.
 	 */
-	protected function replace( $key, $value, $group, $expiration = 0 ) {
-		list( $key, $redis_key ) = $this->build_key( $key, $group );
+	protected function replace( $_key, $value, $group, $expiration = 0 ) {
+		list( $key, $redis_key ) = $this->build_key( $_key, $group );
 
 		// If group is a non-Redis group, save to internal cache, not Redis
 		if ( in_array( $group, $this->no_redis_groups ) || ! $this->can_redis() ) {
@@ -441,8 +441,8 @@ class WP_Object_Cache {
 	 * @param   string $group      The group value appended to the $key.
 	 * @return  bool               Returns TRUE on success or FALSE on failure.
 	 */
-	public function delete( $key, $group ) {
-		list( $key, $redis_key ) = $this->build_key( $key, $group );
+	public function delete( $_key, $group ) {
+		list( $key, $redis_key ) = $this->build_key( $_key, $group );
 
 		if ( in_array( $group, $this->no_redis_groups ) || ! $this->can_redis() ) {
 			if ( ! isset( $this->cache[ $group ], $this->cache[ $group ][ $key ] ) ) {
@@ -481,10 +481,10 @@ class WP_Object_Cache {
 	 * @param   string        $group      The group value appended to the $key.
 	 * @return  bool|mixed                Cached object value.
 	 */
-	public function get( $key, $group = 'default', $force = false ) {
-		list( $key, $redis_key ) = $this->build_key( $key, $group );
+	public function get( $_key, $group = 'default', $force = false ) {
+		list( $key, $redis_key ) = $this->build_key( $_key, $group );
 
-		if ( isset( $this->cache[ $group ][ $key ] ) ) {
+		if ( ! $force && isset( $this->cache[ $group ][ $key ] ) ) {
 			// TODO: Unserialize shenanigans.
 			return is_object( $this->cache[ $group ][ $key ] ) ? clone $this->cache[ $group ][ $key ] : $this->cache[ $group ][ $key ];
 		}
@@ -575,8 +575,8 @@ class WP_Object_Cache {
 	 * @param   int    $expiration The expiration time, defaults to 0.
 	 * @return  bool               Returns TRUE on success or FALSE on failure.
 	 */
-	public function set( $key, $value, $group = 'default', $expiration = 0 ) {
-		list( $key, $redis_key ) = $this->build_key( $key, $group );
+	public function set( $_key, $value, $group = 'default', $expiration = 0 ) {
+		list( $key, $redis_key ) = $this->build_key( $_key, $group );
 
 		if ( is_object( $value ) ) {
 			$value = clone $value;
@@ -606,8 +606,8 @@ class WP_Object_Cache {
 	 * @param  string $group
 	 * @return bool
 	 */
-	public function incr( $key, $offset = 1, $group = 'default' ) {
-		list( $key, $redis_key ) = $this->build_key( $key, $group );
+	public function incr( $_key, $offset = 1, $group = 'default' ) {
+		list( $key, $redis_key ) = $this->build_key( $_key, $group );
 
 		if ( in_array( $group, $this->no_redis_groups ) || ! $this->can_redis() ) {
 			// Consistent with the Redis behavior (start from 0 if not exists)

@@ -28,10 +28,10 @@ class Test_Object_Cache extends WP_UnitTestCase {
 
 		wp_cache_get( 'hit' );
 		wp_cache_get( 'hit' );
-		wp_cache_get( 'hit', 'default', true );
+		$this->assertEquals( '1', wp_cache_get( 'hit', 'default', true ) );
 		$this->assertEquals( '1', wp_cache_get( 'hit' ) );
 
-		$this->assertCount( 2, $this->redis_spy->_get( 'get' ) );
+		$this->assertCount( 1, $this->redis_spy->_get( 'get' ) );
 	}
 
 	public function test_incr_decr() {
