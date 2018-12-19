@@ -1,7 +1,7 @@
 <?php
 /**
- * Plugin Name: Redis Object Cache
- * Author:      Eric Mann & Erick Hitter
+ * Plugin Name: Pressjitsu Redis Object Cache
+ * Author:      Pressjitsu, Inc., Eric Mann & Erick Hitter
  * Version:     1.0
  */
 
@@ -309,7 +309,7 @@ class WP_Object_Cache {
 	 *
 	 * @param   null $persistent_id      To create an instance that persists between requests, use persistent_id to specify a unique ID for the instance.
 	 */
-	public function __construct() {
+	public function __construct( $redis_instance = null ) {
 		// General Redis settings
 		$redis = array(
 			'host' => '127.0.0.1',
@@ -336,7 +336,10 @@ class WP_Object_Cache {
 
 		// Use Redis PECL library.
 		try {
-			$this->redis = new Redis();
+			if ( is_null( $redis_instance ) ) {
+				$redis_instance = new Redis();
+			}
+			$this->redis = $redis_instance;
 			$this->redis->connect( $redis['host'], $redis['port'] );
 			$this->redis->setOption( Redis::OPT_SERIALIZER, Redis::SERIALIZER_NONE );
 
