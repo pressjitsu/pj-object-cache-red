@@ -20,7 +20,7 @@
  *
  * @return bool              Returns TRUE on success or FALSE on failure.
  */
-function wp_cache_add( $key, $value, $group = '', $expiration = 0 ) {
+function wp_cache_add( $key, $value, $group = 'default', $expiration = 0 ) {
 	global $wp_object_cache;
 	return $wp_object_cache->add( $key, $value, $group, $expiration );
 }
@@ -50,7 +50,7 @@ function wp_cache_close() {
  *
  * @return int|bool      Returns item's new value on success or FALSE on failure.
  */
-function wp_cache_decr( $key, $offset = 1, $group = '' ) {
+function wp_cache_decr( $key, $offset = 1, $group = 'default' ) {
 	global $wp_object_cache;
 	return $wp_object_cache->decr( $key, $offset, $group );
 }
@@ -66,7 +66,7 @@ function wp_cache_decr( $key, $offset = 1, $group = '' ) {
  *
  * @return bool           Returns TRUE on success or FALSE on failure.
  */
-function wp_cache_delete( $key, $group = '', $time = 0 ) {
+function wp_cache_delete( $key, $group = 'default', $time = 0 ) {
 	global $wp_object_cache;
 	return $wp_object_cache->delete( $key, $group, $time );
 }
@@ -97,7 +97,7 @@ function wp_cache_flush( $delay = 0 ) {
  *
  * @return bool|mixed             Cached object value.
  */
-function wp_cache_get( $key, $group = '' ) {
+function wp_cache_get( $key, $group = 'default' ) {
 	global $wp_object_cache;
 	return $wp_object_cache->get( $key, $group );
 }
@@ -133,7 +133,7 @@ function wp_cache_get_multi( $groups ) {
  *
  * @return int|bool      Returns item's new value on success or FALSE on failure.
  */
-function wp_cache_incr( $key, $offset = 1, $group = '' ) {
+function wp_cache_incr( $key, $offset = 1, $group = 'default' ) {
 	global $wp_object_cache;
 	return $wp_object_cache->incr( $key, $offset, $group );
 }
@@ -165,7 +165,7 @@ function wp_cache_init() {
  *
  * @return bool              Returns TRUE on success or FALSE on failure.
  */
-function wp_cache_replace( $key, $value, $group = '', $expiration = 0 ) {
+function wp_cache_replace( $key, $value, $group = 'default', $expiration = 0 ) {
 	global $wp_object_cache;
 	return $wp_object_cache->replace( $key, $value, $group, $expiration );
 }
@@ -184,7 +184,7 @@ function wp_cache_replace( $key, $value, $group = '', $expiration = 0 ) {
  *
  * @return bool              Returns TRUE on success or FALSE on failure.
  */
-function wp_cache_set( $key, $value, $group = '', $expiration = 0 ) {
+function wp_cache_set( $key, $value, $group = 'default', $expiration = 0 ) {
 	global $wp_object_cache;
 	return $wp_object_cache->set( $key, $value, $group, $expiration );
 }
@@ -238,7 +238,7 @@ class WP_Object_Cache {
 	/**
 	 * Holds the Redis client.
 	 *
-	 * @var Predis\Client
+	 * @var Redis
 	 */
 	private $redis;
 
@@ -250,7 +250,7 @@ class WP_Object_Cache {
 	private $redis_connected = false;
 
 	/**
-	 * Holds the non-Redis objects.
+	 * Local cache
 	 *
 	 * @var array
 	 */
@@ -298,6 +298,10 @@ class WP_Object_Cache {
 	 */
 	public $cache_misses = 0;
 
+	private $multisite;
+
+	public $stats = array();
+
 	/**
 	 * Instantiate the Redis class.
 	 *
@@ -306,8 +310,6 @@ class WP_Object_Cache {
 	 * @param   null $persistent_id      To create an instance that persists between requests, use persistent_id to specify a unique ID for the instance.
 	 */
 	public function __construct( $redis_instance = null ) {
-		global $blog_id, $table_prefix;
-
 		// General Redis settings
 		$redis = array(
 			'host' => '127.0.0.1',
@@ -339,8 +341,8 @@ class WP_Object_Cache {
 			}
 			$this->redis = $redis_instance;
 			$this->redis->connect( $redis['host'], $redis['port'] );
-			$this->redis->setOption( Redis::OPT_SERIALIZER, $redis['serializer'] );
-			
+			$this->redis->setOption( Redis::OPT_SERIALIZER, Redis::SERIALIZER_NONE );
+
 			if ( isset( $redis['auth'] ) ) {
 				$this->redis->auth( $redis['auth'] );
 			}
@@ -364,11 +366,8 @@ class WP_Object_Cache {
 			define( 'WP_CACHE_KEY_SALT', '' );
 		}
 
-		// Assign global and blog prefixes for use with keys
-		if ( function_exists( 'is_multisite' ) ) {
-			$this->global_prefix = ( is_multisite() || defined( 'CUSTOM_USER_TABLE' ) && defined( 'CUSTOM_USER_META_TABLE' ) ) ? '' : $table_prefix;
-			$this->blog_prefix   = ( is_multisite() ? $blog_id : $table_prefix ) . ':';
-		}
+		$this->multisite = is_multisite();
+		$this->blog_prefix = $this->multisite ? get_current_blog_id() . ':' : '';
 	}
 
 	/**
@@ -392,8 +391,18 @@ class WP_Object_Cache {
 	 * @param   int    $expiration     The expiration time, defaults to 0.
 	 * @return  bool                   Returns TRUE on success or FALSE on failure.
 	 */
-	public function add( $key, $value, $group = 'default', $expiration = 0 ) {
-		return $this->add_or_replace( true, $key, $value, $group, $expiration );
+	public function add( $key, $value, $group, $expiration = 0 ) {
+		if ( wp_suspend_cache_addition() ) {
+			return false;
+		}
+
+		list( $key, $redis_key ) = $this->build_key( $key, $group );
+
+		if ( isset( $this->cache[ $group ], $this->cache[ $group ][ $key ] ) ) {
+			return false;
+		}
+
+		return $this->set( $key, $value, $group, $expiration );
 	}
 
 	/**
@@ -408,58 +417,21 @@ class WP_Object_Cache {
 	 * @param   int    $expiration     The expiration time, defaults to 0.
 	 * @return  bool                   Returns TRUE on success or FALSE on failure.
 	 */
-	public function replace( $key, $value, $group = 'default', $expiration = 0 ) {
-		return $this->add_or_replace( false, $key, $value, $group, $expiration );
-	}
-
-	/**
-	 * Add or replace a value in the cache.
-	 *
-	 * Add does not set the value if the key exists; replace does not replace if the value doesn't exist.
-	 *
-	 * @param   bool   $add            True if should only add if value doesn't exist, false to only add when value already exists
-	 * @param   string $key            The key under which to store the value.
-	 * @param   mixed  $value          The value to store.
-	 * @param   string $group          The group value appended to the $key.
-	 * @param   int    $expiration     The expiration time, defaults to 0.
-	 * @return  bool                   Returns TRUE on success or FALSE on failure.
-	 */
-	protected function add_or_replace( $add, $key, $value, $group = 'default', $expiration = 0 ) {
-		$derived_key = $this->build_key( $key, $group );
+	protected function replace( $key, $value, $group, $expiration = 0 ) {
+		list( $key, $redis_key ) = $this->build_key( $key, $group );
 
 		// If group is a non-Redis group, save to internal cache, not Redis
 		if ( in_array( $group, $this->no_redis_groups ) || ! $this->can_redis() ) {
-
-			// Check if conditions are right to continue
-			if (
-				( $add   &&   isset( $this->cache[ $derived_key ] ) ) ||
-				( ! $add && ! isset( $this->cache[ $derived_key ] ) )
-			) {
+			if ( ! isset( $this->cache[ $group ], $this->cache[ $group ][ $key ] ) ) {
 				return false;
 			}
-
-			$this->add_to_internal_cache( $derived_key, $value );
-
-			return true;
-		}
-
-		// Check if conditions are right to continue
-		if (
-			( $add   &&   $this->redis->exists( $derived_key ) ) ||
-			( ! $add && ! $this->redis->exists( $derived_key ) )
-		) {
-			return false;
-		}
-
-		// Save to Redis
-		$expiration = abs( intval( $expiration ) );
-		if ( $expiration ) {
-			$result = $this->parse_predis_response( $this->redis->setex( $derived_key, $expiration, $value ) );
 		} else {
-			$result = $this->parse_predis_response( $this->redis->set( $derived_key, $value ) );
+			if ( $this->redis->exists( $redis_key ) ) {
+				return false;
+			}
 		}
 
-		return $result;
+		return $this->set( $key, $value, $group, $expiration );
 	}
 
 	/**
@@ -469,46 +441,35 @@ class WP_Object_Cache {
 	 * @param   string $group      The group value appended to the $key.
 	 * @return  bool               Returns TRUE on success or FALSE on failure.
 	 */
-	public function delete( $key, $group = 'default' ) {
-		$derived_key = $this->build_key( $key, $group );
+	public function delete( $key, $group ) {
+		list( $key, $redis_key ) = $this->build_key( $key, $group );
 
-		// Remove from no_redis_groups array
 		if ( in_array( $group, $this->no_redis_groups ) || ! $this->can_redis() ) {
-			if ( isset( $this->cache[ $derived_key ] ) ) {
-				unset( $this->cache[ $derived_key ] );
-
-				return true;
-			} else {
+			if ( ! isset( $this->cache[ $group ], $this->cache[ $group ][ $key ] ) ) {
 				return false;
 			}
+
+			unset( $this->cache[ $group ][ $key ] );
+			return true;
 		}
 
-		$result = $this->parse_predis_response( $this->redis->del( $derived_key ) );
-
-		unset( $this->cache[ $derived_key ] );
-
-		return $result;
+		unset( $this->cache[ $group ][ $key ] );
+		return (bool) $this->redis->delete( $redis_key );
 	}
 
 	/**
 	 * Invalidate all items in the cache.
 	 *
-	 * @param   int $delay      Number of seconds to wait before invalidating the items.
-	 * @return  bool            Returns TRUE on success or FALSE on failure.
+	 * @return  bool
 	 */
-	public function flush( $delay = 0 ) {
-		$delay = abs( intval( $delay ) );
-		if ( $delay ) {
-			sleep( $delay );
-		}
-
+	public function flush() {
 		$this->cache = array();
 
 		if ( $this->can_redis() ) {
-			$result = $this->parse_predis_response( $this->redis->flushdb() );
+			$this->redis->flushDb();
 		}
 
-		return $result;
+		return true;
 	}
 
 	/**
@@ -520,30 +481,28 @@ class WP_Object_Cache {
 	 * @param   string        $group      The group value appended to the $key.
 	 * @return  bool|mixed                Cached object value.
 	 */
-	public function get( $key, $group = 'default' ) {
-		$derived_key = $this->build_key( $key, $group );
+	public function get( $key, $group = 'default', $force = false ) {
+		list( $key, $redis_key ) = $this->build_key( $key, $group );
 
-		if ( in_array( $group, $this->no_redis_groups ) || ! $this->can_redis() ) {
-			if ( isset( $this->cache[ $derived_key ] ) ) {
-				$this->cache_hits++;
-				return is_object( $this->cache[ $derived_key ] ) ? clone $this->cache[ $derived_key ] : $this->cache[ $derived_key ];
-			} else {
-				$this->cache_misses++;
-				return false;
-			}
+		if ( isset( $this->cache[ $group ][ $key ] ) ) {
+			// TODO: Unserialize shenanigans.
+			return is_object( $this->cache[ $group ][ $key ] ) ? clone $this->cache[ $group ][ $key ] : $this->cache[ $group ][ $key ];
 		}
 
-		if ( $this->redis->exists( $derived_key ) ) {
-			$this->cache_hits++;
-			$value = $this->redis->get( $derived_key );
-		} else {
-			$this->cache_misses;
+		if ( in_array( $group, $this->no_redis_groups ) || ! $this->can_redis() ) {
 			return false;
 		}
 
-		$this->add_to_internal_cache( $derived_key, $value );
+		// Fetch from Redis
+		$value = $this->redis->get( $redis_key );
 
-		return is_object( $value ) ? clone $value : $value;
+		if ( ! is_string( $value ) ) {
+			return false;
+		}
+
+		$value = unserialize( $value );
+		$this->cache[ $group ][ $key ] = $value;
+		return $value;
 	}
 
 	/**
@@ -617,24 +576,26 @@ class WP_Object_Cache {
 	 * @return  bool               Returns TRUE on success or FALSE on failure.
 	 */
 	public function set( $key, $value, $group = 'default', $expiration = 0 ) {
-		$derived_key = $this->build_key( $key, $group );
+		list( $key, $redis_key ) = $this->build_key( $key, $group );
 
-		// If group is a non-Redis group, save to internal cache, not Redis
+		if ( is_object( $value ) ) {
+			$value = clone $value;
+		}
+
+		$this->cache[ $group ][ $key ] = $value;
+
 		if ( in_array( $group, $this->no_redis_groups ) || ! $this->can_redis() ) {
-			$this->add_to_internal_cache( $derived_key, $value );
-
 			return true;
 		}
 
 		// Save to Redis
-		$expiration = abs( intval( $expiration ) );
 		if ( $expiration ) {
-			$result = $this->parse_predis_response( $this->redis->setex( $derived_key, $expiration, $value ) );
+			$this->redis->setex( $redis_key, $expiration, serialize( $value ) );
 		} else {
-			$result = $this->parse_predis_response( $this->redis->set( $derived_key, $value ) );
+			$this->redis->set( $redis_key, serialize( $value ) );
 		}
 
-		return $result;
+		return true;
 	}
 
 	/**
@@ -646,24 +607,22 @@ class WP_Object_Cache {
 	 * @return bool
 	 */
 	public function incr( $key, $offset = 1, $group = 'default' ) {
-		$derived_key = $this->build_key( $key, $group );
-		$offset = (int) $offset;
+		list( $key, $redis_key ) = $this->build_key( $key, $group );
 
-		// If group is a non-Redis group, save to internal cache, not Redis
 		if ( in_array( $group, $this->no_redis_groups ) || ! $this->can_redis() ) {
-			$value = $this->get_from_internal_cache( $derived_key, $group );
-			$value += $offset;
-			$this->add_to_internal_cache( $derived_key, $value );
+			// Consistent with the Redis behavior (start from 0 if not exists)
+			if ( ! isset( $this->cache[ $group ][ $key ] ) ) {
+				$this->cache[ $group ][ $key ] = 0;
+			}
 
+			$this->cache[ $group ][ $key ] += $offset;
 			return true;
 		}
 
 		// Save to Redis
-		$result = $this->parse_predis_response( $this->redis->incrBy( $derived_key, $offset ) );
-
-		$this->add_to_internal_cache( $derived_key, (int) $this->redis->get( $derived_key ) );
-
-		return $result;
+		$value = $this->redis->incrBy( $redis_key, $offset );
+		$this->cache[ $group ][ $key ] = $value;
+		return $value;
 	}
 
 	/**
@@ -675,47 +634,7 @@ class WP_Object_Cache {
 	 * @return bool
 	 */
 	public function decr( $key, $offset = 1, $group = 'default' ) {
-		$derived_key = $this->build_key( $key, $group );
-		$offset = (int) $offset;
-
-		// If group is a non-Redis group, save to internal cache, not Redis
-		if ( in_array( $group, $this->no_redis_groups ) || ! $this->can_redis() ) {
-			$value = $this->get_from_internal_cache( $derived_key, $group );
-			$value -= $offset;
-			$this->add_to_internal_cache( $derived_key, $value );
-
-			return true;
-		}
-
-		// Save to Redis
-		$result = $this->parse_predis_response( $this->redis->decrBy( $derived_key, $offset ) );
-
-		$this->add_to_internal_cache( $derived_key, (int) $this->redis->get( $derived_key ) );
-
-		return $result;
-	}
-
-	/**
-	 * Render data about current cache requests
-	 *
-	 * @return string
-	 */
-	public function stats() {
-		?><p>
-			<strong><?php $this->_i18n( '_e', 'Cache Hits:' ); ?></strong> <?php echo $this->_i18n( 'number_format_i18n', $this->cache_hits, false ); ?><br />
-			<strong><?php $this->_i18n( '_e', 'Cache Misses:' ); ?></strong> <?php echo $this->_i18n( 'number_format_i18n', $this->cache_misses, false ); ?><br />
-			<strong><?php $this->_i18n( '_e', 'Using Redis?' ); ?></strong> 
-			<?php echo $this->can_redis() ? $this->_i18n( '__', 'yes' ) : $this->_i18n( '__', 'no' );
-			?><br />
-		</p>
-		<p>&nbsp;</p>
-		<p><strong><?php $this->_i18n( '_e',  'Caches Retrieved:' ); ?></strong></p>
-		<ul>
-			<li><em><?php $this->_i18n( '_e',  'prefix:group:key - size in kilobytes' ); ?></em></li>
-		<?php foreach ( $this->cache as $group => $cache ) : ?>
-			<li><?php printf( $this->_i18n( '__', '%s - %s %s' ), $this->_esc_html( $group, false ), $this->_i18n( 'number_format_i18n', strlen( serialize( $cache ) ) / 1024, false, 2 ), $this->_i18n( '__', 'kb' ) ); ?></li>
-		<?php endforeach; ?>
-		</ul><?php
+		return $this->incr( $key, $offset * -1, $group );
 	}
 
 	/**
@@ -727,20 +646,21 @@ class WP_Object_Cache {
 	 * @param   string $key        The key under which to store the value.
 	 * @param   string $group      The group value appended to the $key.
 	 *
-	 * @return  string
+	 * @return  array
 	 */
 	public function build_key( $key, $group = 'default' ) {
 		if ( empty( $group ) ) {
 			$group = 'default';
 		}
 
-		if ( false !== array_search( $group, $this->global_groups ) ) {
-			$prefix = $this->global_prefix;
-		} else {
+		$prefix = '';
+		if ( false === array_search( $group, $this->global_groups ) ) {
 			$prefix = $this->blog_prefix;
 		}
 
-		return preg_replace( '/\s+/', '', WP_CACHE_KEY_SALT . "$prefix$group:$key" );
+		$local_key = $prefix . $key;
+		$redis_key = preg_replace( '/\s+/', '', WP_CACHE_KEY_SALT . "$prefix$group:$key" );
+		return array( $local_key, $redis_key );
 	}
 
 	/**
@@ -761,68 +681,13 @@ class WP_Object_Cache {
 	}
 
 	/**
-	 * Convert the response fro Predis into something meaningful
-	 *
-	 * @param mixed $response
-	 * @return mixed
-	 */
-	protected function parse_predis_response( $response ) {
-		if ( is_bool( $response ) ) {
-			return $response;
-		}
-
-		if ( is_numeric( $response ) ) {
-			return (bool) $response;
-		}
-
-		if ( is_object( $response ) && method_exists( $response, 'getPayload' ) ) {
-			return 'OK' === $response->getPayload();
-		}
-
-		return false;
-	}
-
-	/**
-	 * Simple wrapper for saving object to the internal cache.
-	 *
-	 * @param   string $derived_key    Key to save value under.
-	 * @param   mixed  $value          Object value.
-	 */
-	public function add_to_internal_cache( $derived_key, $value ) {
-		$this->cache[ $derived_key ] = $value;
-	}
-
-	/**
-	 * Get a value specifically from the internal, run-time cache, not Redis.
-	 *
-	 * @param   int|string $key        Key value.
-	 * @param   int|string $group      Group that the value belongs to.
-	 *
-	 * @return  bool|mixed              Value on success; false on failure.
-	 */
-	public function get_from_internal_cache( $key, $group ) {
-		$derived_key = $this->build_key( $key, $group );
-
-		if ( isset( $this->cache[ $derived_key ] ) ) {
-			return $this->cache[ $derived_key ];
-		}
-
-		return false;
-	}
-
-	/**
 	 * In multisite, switch blog prefix when switching blogs
 	 *
 	 * @param int $_blog_id
 	 * @return bool
 	 */
-	public function switch_to_blog( $_blog_id ) {
-		if ( ! function_exists( 'is_multisite' ) || ! is_multisite() ) {
-			return false;
-		}
-
-		$this->blog_prefix = $_blog_id . ':';
-		return true;
+	public function switch_to_blog( $blog_id ) {
+		$this->blog_prefix = $this->multisite ? $blog_id . ':' : '';
 	}
 
 	/**
@@ -849,53 +714,5 @@ class WP_Object_Cache {
 		$groups = (array) $groups;
 
 		$this->no_redis_groups = array_unique( array_merge( $this->no_redis_groups, $groups ) );
-	}
-	/**
-	 * Run a value through an i18n WP function if it exists. Otherwise, just rpass through.
-	 *
-	 * Since this class may run befor the i18n methods are loaded in WP, we'll make sure they
-	 * exist before using them. Most require a text domain, some don't, so the second param allows
-	 * specifiying which type is being called.
-	 * 
-	 * @param  string $method The WP method to pass the string through if it exists.
-	 * @param  string $string The string to internationalize.
-	 * @param  bool   $domain Whether or not to pass the text domain to the method as well.
-	 * @param  mixed  $params Any extra param or array of params to send to the method.
-	 * @return string         The maybe internationalaized string.
-	 */
-	protected function _i18n( $method, $string, $domain = true, $params = array() ) {
-		// Pass through if the method doesn't exist.
-		if ( ! function_exists( $method ) ) {
-			return $string;
-		}
-		// Allow non-array single extra values
-		if ( ! is_array( $params ) ) {
-			$params = array( $params );
-		}
-		// Add domain param if needed.
-		if ( (bool) $domain ) {
-			array_unshift( $params, 'wordpress-redis-backend' );
-		}
-		// Add the string
-		array_unshift( $params, $string );
-
-		return call_user_func_array( $method, $params );
-	}
-	/**
-	 * Try to escape any HTML from output, if not available, strip tags.
-	 *
-	 * This helper ensures invalid HTML output is escaped with esc_html if possible. If not,
-	 * it will use the native strip_tags instead to simply remove them. This is needed since
-	 * in some circumstances this may be loaded before esc_html is available.
-	 *
-	 * @param  string $string The string to escape or strip.
-	 * @return string        The safe string for output.
-	 */
-	public function _esc_html( $string ) {
-		if ( function_exists( 'esc_html' ) ) {
-			return esc_html( $string );
-		} else {
-			return strip_tags( $string );
-		}
 	}
 }
