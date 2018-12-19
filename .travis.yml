@@ -8,6 +8,9 @@ notifications:
     on_success: never
     on_failure: change
 
+service:
+    - redis-server
+
 branches:
   only:
     - master
