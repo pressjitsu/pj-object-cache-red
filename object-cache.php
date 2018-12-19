@@ -398,7 +398,7 @@ class WP_Object_Cache {
 
 		list( $key, $redis_key ) = $this->build_key( $_key, $group );
 
-		if ( isset( $this->cache[ $group ], $this->cache[ $group ][ $key ] ) ) {
+		if ( isset( $this->cache[ $group ], $this->cache[ $group ][ $key ] ) && false !== $this->cache[ $group ][ $key ] ) {
 			return false;
 		}
 
@@ -484,7 +484,7 @@ class WP_Object_Cache {
 	public function get( $_key, $group = 'default', $force = false ) {
 		list( $key, $redis_key ) = $this->build_key( $_key, $group );
 
-		if ( isset( $this->cache[ $group ][ $key ] ) ) {
+		if ( ! $force && isset( $this->cache[ $group ][ $key ] ) ) {
 			// TODO: Unserialize shenanigans.
 			return is_object( $this->cache[ $group ][ $key ] ) ? clone $this->cache[ $group ][ $key ] : $this->cache[ $group ][ $key ];
 		}
@@ -497,6 +497,7 @@ class WP_Object_Cache {
 		$value = $this->redis->get( $redis_key );
 
 		if ( ! is_string( $value ) ) {
+			$this->cache[ $group ][ $key ] = false;
 			return false;
 		}
 
