@@ -718,10 +718,6 @@ class WP_Object_Cache {
 	 * @return  array
 	 */
 	public function build_key( $key, $group = 'default' ) {
-		if ( empty( $group ) ) {
-			$group = 'default';
-		}
-
 		$prefix = '';
 		if ( isset( $this->_global_groups[ $group ] ) ) {
 			$prefix = $this->blog_prefix;
