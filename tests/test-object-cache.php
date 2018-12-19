@@ -55,10 +55,10 @@ class Test_Object_Cache extends WP_UnitTestCase {
 
 		$this->assertEquals( array(
 			'group2' => array(
-				'hit' => '1',
+				'hit' => '2',
 			),
 			'default' => array(
-				'hit' => '2',
+				'hit' => '1',
 			)
 		), $result );
 
