@@ -47,5 +47,4 @@ script:
   - |
     if [[ ! -z "$WP_VERSION" ]] ; then
       phpunit --no-coverage
-      WP_MULTISITE=1 phpunit --no-coverage
     fi
