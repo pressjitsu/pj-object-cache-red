@@ -725,8 +725,7 @@ class WP_Object_Cache {
 		}
 
 		$local_key = $prefix . $key;
-		$redis_key = preg_replace( '/\s+/', '', WP_CACHE_KEY_SALT . "$prefix$group:$key" );
-		return array( $local_key, $redis_key );
+		return array( $local_key, WP_CACHE_KEY_SALT . "$prefix$group:$key" );
 	}
 
 	/**

@@ -14,6 +14,26 @@ class Test_Object_Cache extends WP_UnitTestCase {
 		$this->assertEquals( '1', wp_cache_get( 'miss', 'group' ) );
 	}
 
+	public function test_spaces_in_keys() {
+		global $wp_object_cache;
+
+		wp_cache_set( 'hello world', '1' );
+		$this->assertEquals( '1', wp_cache_get( 'hello world' ) );
+
+		$wp_object_cache->cache = array();
+
+		$this->assertEquals( '1', wp_cache_get( 'hello world' ) );
+
+		wp_cache_set( 'helloworld', '2' );
+		$this->assertEquals( '1', wp_cache_get( 'hello world') );
+		$this->assertEquals( '2', wp_cache_get( 'helloworld' ) );
+
+		$wp_object_cache->cache = array();
+
+		$this->assertEquals( '1', wp_cache_get( 'hello world') );
+		$this->assertEquals( '2', wp_cache_get( 'helloworld' ) );
+	}
+
 	public function test_internal_cache_miss() {
 		wp_cache_get( 'miss' );
 		wp_cache_get( 'miss' );
