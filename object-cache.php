@@ -97,9 +97,9 @@ function wp_cache_flush( $delay = 0 ) {
  *
  * @return bool|mixed             Cached object value.
  */
-function wp_cache_get( $key, $group = 'default' ) {
+function wp_cache_get( $key, $group = 'default', $force = false ) {
 	global $wp_object_cache;
-	return $wp_object_cache->get( $key, $group );
+	return $wp_object_cache->get( $key, $group, $force );
 }
 
 /**
