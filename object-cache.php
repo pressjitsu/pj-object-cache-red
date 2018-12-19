@@ -559,7 +559,8 @@ class WP_Object_Cache {
 				continue;
 			}
 
-			$cache[ $map[ $redis_key ][0] ] = unserialize( $value );
+			list( $group, $key ) = $map[ $redis_key ];
+			$this->cache[ $group ][ $key ] = $cache[ $group ][ $key ] = unserialize( $value );
 		}
 
 		return $cache;
