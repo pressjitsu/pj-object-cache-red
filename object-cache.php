@@ -267,6 +267,8 @@ class WP_Object_Cache {
 	 */
 	public $global_groups = array( 'users', 'userlogins', 'usermeta', 'site-options', 'site-lookup', 'blog-lookup', 'blog-details', 'rss' );
 
+	private $_global_groups;
+
 	/**
 	 * List of groups not saved to Redis.
 	 *
@@ -367,6 +369,7 @@ class WP_Object_Cache {
 
 		$this->multisite = is_multisite();
 		$this->blog_prefix = $this->multisite ? get_current_blog_id() . ':' : '';
+		$this->_global_groups = array_flip( $this->global_groups );
 
 		$this->maybe_preload();
 	}
@@ -719,14 +722,8 @@ class WP_Object_Cache {
 			$group = 'default';
 		}
 
-		static $global_groups;
-
-		if ( is_null( $global_groups ) ) {
-			$global_groups = array_flip( $this->global_groups );
-		}
-
 		$prefix = '';
-		if ( isset( $this->global_groups[ $group ] ) ) {
+		if ( isset( $this->_global_groups[ $group ] ) ) {
 			$prefix = $this->blog_prefix;
 		}
 
@@ -774,6 +771,8 @@ class WP_Object_Cache {
 		} else {
 			$this->no_redis_groups = array_unique( array_merge( $this->no_redis_groups, $groups ) );
 		}
+
+		$this->_global_groups = array_flip( $this->global_groups );
 	}
 
 	/**
