@@ -1,7 +1,7 @@
 <?php
 /**
- * Plugin Name: Pressjitsu Redis Object Cache
- * Author:      Pressjitsu, Inc., Eric Mann & Erick Hitter
+ * Plugin Name: Redis Object Cache
+ * Author:      Eric Mann & Erick Hitter
  * Version:     1.0
  */
 
@@ -309,7 +309,7 @@ class WP_Object_Cache {
 	 *
 	 * @param   null $persistent_id      To create an instance that persists between requests, use persistent_id to specify a unique ID for the instance.
 	 */
-	public function __construct( $redis_instance = null ) {
+	public function __construct() {
 		// General Redis settings
 		$redis = array(
 			'host' => '127.0.0.1',
@@ -336,10 +336,7 @@ class WP_Object_Cache {
 
 		// Use Redis PECL library.
 		try {
-			if ( is_null( $redis_instance ) ) {
-				$redis_instance = new Redis();
-			}
-			$this->redis = $redis_instance;
+			$this->redis = new Redis();
 			$this->redis->connect( $redis['host'], $redis['port'] );
 			$this->redis->setOption( Redis::OPT_SERIALIZER, Redis::SERIALIZER_NONE );
 
@@ -391,12 +388,12 @@ class WP_Object_Cache {
 	 * @param   int    $expiration     The expiration time, defaults to 0.
 	 * @return  bool                   Returns TRUE on success or FALSE on failure.
 	 */
-	public function add( $_key, $value, $group, $expiration = 0 ) {
+	public function add( $key, $value, $group, $expiration = 0 ) {
 		if ( wp_suspend_cache_addition() ) {
 			return false;
 		}
 
-		list( $key, $redis_key ) = $this->build_key( $_key, $group );
+		list( $key, $redis_key ) = $this->build_key( $key, $group );
 
 		if ( isset( $this->cache[ $group ], $this->cache[ $group ][ $key ] ) ) {
 			return false;
@@ -417,8 +414,8 @@ class WP_Object_Cache {
 	 * @param   int    $expiration     The expiration time, defaults to 0.
 	 * @return  bool                   Returns TRUE on success or FALSE on failure.
 	 */
-	protected function replace( $_key, $value, $group, $expiration = 0 ) {
-		list( $key, $redis_key ) = $this->build_key( $_key, $group );
+	protected function replace( $key, $value, $group, $expiration = 0 ) {
+		list( $key, $redis_key ) = $this->build_key( $key, $group );
 
 		// If group is a non-Redis group, save to internal cache, not Redis
 		if ( in_array( $group, $this->no_redis_groups ) || ! $this->can_redis() ) {
@@ -441,8 +438,8 @@ class WP_Object_Cache {
 	 * @param   string $group      The group value appended to the $key.
 	 * @return  bool               Returns TRUE on success or FALSE on failure.
 	 */
-	public function delete( $_key, $group ) {
-		list( $key, $redis_key ) = $this->build_key( $_key, $group );
+	public function delete( $key, $group ) {
+		list( $key, $redis_key ) = $this->build_key( $key, $group );
 
 		if ( in_array( $group, $this->no_redis_groups ) || ! $this->can_redis() ) {
 			if ( ! isset( $this->cache[ $group ], $this->cache[ $group ][ $key ] ) ) {
@@ -481,10 +478,10 @@ class WP_Object_Cache {
 	 * @param   string        $group      The group value appended to the $key.
 	 * @return  bool|mixed                Cached object value.
 	 */
-	public function get( $_key, $group = 'default', $force = false ) {
-		list( $key, $redis_key ) = $this->build_key( $_key, $group );
+	public function get( $key, $group = 'default', $force = false ) {
+		list( $key, $redis_key ) = $this->build_key( $key, $group );
 
-		if ( ! $force && isset( $this->cache[ $group ][ $key ] ) ) {
+		if ( isset( $this->cache[ $group ][ $key ] ) ) {
 			// TODO: Unserialize shenanigans.
 			return is_object( $this->cache[ $group ][ $key ] ) ? clone $this->cache[ $group ][ $key ] : $this->cache[ $group ][ $key ];
 		}
@@ -512,10 +509,7 @@ class WP_Object_Cache {
 	 *
 	 * Usage: array( 'group0' => array( 'key0', 'key1', 'key2', ), 'group1' => array( 'key0' ) )
 	 *
-	 * Mirrors the Memcached Object Cache plugin's argument and return-value formats
-	 *
 	 * @param   array                           $groups  Array of groups and keys to retrieve
-	 * @uses    this::filter_redis_get_multi()
 	 * @return  bool|mixed                               Array of cached values, keys in the format $group:$key. Non-existent keys null.
 	 */
 	public function get_multi( $groups ) {
@@ -525,40 +519,44 @@ class WP_Object_Cache {
 
 		// Retrieve requested caches and reformat results to mimic Memcached Object Cache's output
 		$cache = array();
+		$fetch_keys = array();
+		$map = array();
 
 		foreach ( $groups as $group => $keys ) {
 			if ( in_array( $group, $this->no_redis_groups ) || ! $this->can_redis() ) {
 				foreach ( $keys as $key ) {
-					$cache[ $this->build_key( $key, $group ) ] = $this->get( $key, $group );
-				}
-			} else {
-				// Reformat arguments as expected by Redis
-				$derived_keys = array();
-				foreach ( $keys as $key ) {
-					$derived_keys[] = $this->build_key( $key, $group );
+					list( $key, $redis_key ) = $this->build_key( $key, $group );
+					$cache[ $group ][ $key ] = $this->get( $key, $group );
 				}
 
-				// Retrieve from cache in a single request
-				$group_cache = $this->redis->mget( $derived_keys );
+				continue;
+			}
 
-				// Build an array of values looked up, keyed by the derived cache key
-				$group_cache = array_combine( $derived_keys, $group_cache );
+			if ( empty( $cache[ $group ] ) ) {
+				$cache[ $group ] = array();
+			}
 
-				// Redis returns null for values not found in cache, but expected return value is false in this instance
-				$group_cache = array_map( array( $this, 'filter_redis_get_multi' ), $group_cache );
+			foreach ( $keys as $key ) {
+				list( $key, $redis_key ) = $this->build_key( $key, $group );
 
-				$cache = array_merge( $cache, $group_cache );
+				if ( isset( $this->cache[ $group ][ $key ] ) ) {
+					$cache[ $group ][ $key ] = $this->cache[ $group ][ $key ];
+					continue;
+				}
+
+				// Fetch these from Redis
+				$map[ $redis_key ] = array( $group, $key );
+				$fetch_keys[] = $redis_key;
 			}
 		}
 
-		// Add to the internal cache the found values from Redis
-		foreach ( $cache as $key => $value ) {
-			if ( $value ) {
-				$this->cache_hits++;
-				$this->add_to_internal_cache( $key, $value );
-			} else {
-				$this->cache_misses++;
+		$results = $this->redis->mget( $fetch_keys );
+		foreach( array_combine( $fetch_keys, $results ) as $redis_key => $value ) {
+			if ( ! is_string( $value ) ) {
+				continue;
 			}
+
+			$cache[ $map[ $redis_key ][0] ] = unserialize( $value );
 		}
 
 		return $cache;
@@ -575,8 +573,8 @@ class WP_Object_Cache {
 	 * @param   int    $expiration The expiration time, defaults to 0.
 	 * @return  bool               Returns TRUE on success or FALSE on failure.
 	 */
-	public function set( $_key, $value, $group = 'default', $expiration = 0 ) {
-		list( $key, $redis_key ) = $this->build_key( $_key, $group );
+	public function set( $key, $value, $group = 'default', $expiration = 0 ) {
+		list( $key, $redis_key ) = $this->build_key( $key, $group );
 
 		if ( is_object( $value ) ) {
 			$value = clone $value;
@@ -606,8 +604,8 @@ class WP_Object_Cache {
 	 * @param  string $group
 	 * @return bool
 	 */
-	public function incr( $_key, $offset = 1, $group = 'default' ) {
-		list( $key, $redis_key ) = $this->build_key( $_key, $group );
+	public function incr( $key, $offset = 1, $group ) {
+		list( $key, $redis_key ) = $this->build_key( $key, $group );
 
 		if ( in_array( $group, $this->no_redis_groups ) || ! $this->can_redis() ) {
 			// Consistent with the Redis behavior (start from 0 if not exists)
