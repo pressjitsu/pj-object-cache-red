@@ -446,7 +446,7 @@ class WP_Object_Cache {
 			return false;
 		}
 
-		return $this->set( $key, $value, $group, $expiration );
+		return $this->set( $_key, $value, $group, $expiration );
 	}
 
 	/**
@@ -719,7 +719,7 @@ class WP_Object_Cache {
 	 */
 	public function build_key( $key, $group = 'default' ) {
 		$prefix = '';
-		if ( isset( $this->_global_groups[ $group ] ) ) {
+		if ( ! isset( $this->_global_groups[ $group ] ) ) {
 			$prefix = $this->blog_prefix;
 		}
 
