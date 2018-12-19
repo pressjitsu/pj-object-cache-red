@@ -604,6 +604,11 @@ class WP_Object_Cache {
 			}
 		}
 
+		// Nothing else to fetch
+		if ( empty( $fetch_keys ) ) {
+			return $cache;
+		}
+
 		$results = $this->redis->mget( $fetch_keys );
 		foreach( array_combine( $fetch_keys, $results ) as $redis_key => $value ) {
 			list( $group, $key ) = $map[ $redis_key ];
