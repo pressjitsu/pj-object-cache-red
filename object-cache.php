@@ -258,6 +258,8 @@ class WP_Object_Cache {
 
 	private $to_unserialize = array();
 
+	private $to_preload = array();
+
 	/**
 	 * List of global groups.
 	 *
@@ -365,6 +367,48 @@ class WP_Object_Cache {
 
 		$this->multisite = is_multisite();
 		$this->blog_prefix = $this->multisite ? get_current_blog_id() . ':' : '';
+
+		$this->maybe_preload();
+	}
+
+	public function maybe_preload() {
+		if ( ! $this->can_redis() || empty( $_SERVER['REQUEST_URI'] ) ) {
+			return;
+		}
+
+		if ( defined( 'WP_CLI' ) && WP_CLI ) {
+			return;
+		}
+
+		$request_hash = md5( json_encode( array(
+			$_SERVER['HTTP_HOST'],
+			$_SERVER['REQUEST_URI'],
+		) ) );
+
+		$this->preload( $request_hash );
+		register_shutdown_function( array( $this, 'save_preloads' ), $request_hash );
+	}
+
+	public function preload( $hash ) {
+		$keys = $this->get( $hash, 'pj-preload' );
+		if ( is_array( $keys ) ) {
+			$this->get_multi( $keys, false );
+		}
+	}
+
+	public function save_preloads( $hash ) {
+		$keys = array();
+
+		foreach ( $this->to_preload as $group => $_keys ) {
+			if ( $group === 'pj-preload' ) {
+				continue;
+			}
+
+			$_keys = array_keys( $_keys );
+			$keys[ $group ] = $_keys;
+		}
+
+		$this->set( $hash, $keys, 'pj-preload' );
 	}
 
 	/**
@@ -481,6 +525,8 @@ class WP_Object_Cache {
 	public function get( $_key, $group = 'default', $force = false ) {
 		list( $key, $redis_key ) = $this->build_key( $_key, $group );
 
+		$this->to_preload[ $group ][ $key ] = true;
+
 		if ( ! $force && isset( $this->cache[ $group ][ $key ] ) ) {
 			$value = $this->cache[ $group ][ $key ];
 
@@ -560,16 +606,17 @@ class WP_Object_Cache {
 
 		$results = $this->redis->mget( $fetch_keys );
 		foreach( array_combine( $fetch_keys, $results ) as $redis_key => $value ) {
-			if ( ! is_string( $value ) ) {
-				continue;
-			}
-
 			list( $group, $key ) = $map[ $redis_key ];
 
-			if ( ! $unserialize ) {
-				$this->to_unserialize[ $redis_key ] = true;
+			if ( is_string( $value ) ) {
+				if ( ! $unserialize ) {
+					$this->to_unserialize[ $redis_key ] = true;
+				} else {
+					$this->to_preload[ $group ][ $key ] = true;
+					$value = unserialize( $value );
+				}
 			} else {
-				$value = unserialize( $value );
+				$value = false;
 			}
 
 			$this->cache[ $group ][ $key ] = $cache[ $group ][ $key ] = $value;
