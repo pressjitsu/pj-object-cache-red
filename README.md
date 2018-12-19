@@ -1,9 +1,10 @@
 ## Overview
 
-A WordPress object cache backend that implements all available methods using the Redis PECL library.
+A highly efficient, predictive and unit tested WordPress object cache backend that implements all available methods using the Redis PECL library.
 
 ## Authors
 
+* Pressjitsu, Inc.
 * Eric Mann
 * Erick Hitter
 

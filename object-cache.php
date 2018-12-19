@@ -52,7 +52,7 @@ function wp_cache_close() {
  */
 function wp_cache_decr( $key, $offset = 1, $group = '' ) {
 	global $wp_object_cache;
-	return $wp_object_cache->decrement( $key, $offset, $group );
+	return $wp_object_cache->decr( $key, $offset, $group );
 }
 
 /**
@@ -135,7 +135,7 @@ function wp_cache_get_multi( $groups ) {
  */
 function wp_cache_incr( $key, $offset = 1, $group = '' ) {
 	global $wp_object_cache;
-	return $wp_object_cache->increment( $key, $offset, $group );
+	return $wp_object_cache->incr( $key, $offset, $group );
 }
 
 /**
@@ -254,7 +254,7 @@ class WP_Object_Cache {
 	 *
 	 * @var array
 	 */
-	private $cache = array();
+	public $cache = array();
 
 	/**
 	 * List of global groups.
@@ -642,7 +642,7 @@ class WP_Object_Cache {
 	 * @param  string $group
 	 * @return bool
 	 */
-	public function increment( $key, $offset = 1, $group = 'default' ) {
+	public function incr( $key, $offset = 1, $group = 'default' ) {
 		$derived_key = $this->build_key( $key, $group );
 		$offset = (int) $offset;
 
@@ -671,7 +671,7 @@ class WP_Object_Cache {
 	 * @param  string $group
 	 * @return bool
 	 */
-	public function decrement( $key, $offset = 1, $group = 'default' ) {
+	public function decr( $key, $offset = 1, $group = 'default' ) {
 		$derived_key = $this->build_key( $key, $group );
 		$offset = (int) $offset;
 
