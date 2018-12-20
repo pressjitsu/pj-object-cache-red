@@ -84,10 +84,10 @@ class Test_Object_Cache extends WP_UnitTestCase {
 
 		$this->assertEquals( array(
 			'group2' => array(
-				'hit' => '2',
+				'1:hit' => '2',
 			),
 			'default' => array(
-				'hit' => '1',
+				'1:hit' => '1',
 			)
 		), $result );
 
@@ -126,10 +126,10 @@ class Test_Object_Cache extends WP_UnitTestCase {
 
 		$this->assertEquals( array(
 			'group2' => array(
-				'hit' => '2',
+				'1:hit' => '2',
 			),
 			'default' => array(
-				'hit' => '1',
+				'1:hit' => '1',
 			)
 		), $result );
 
@@ -139,8 +139,6 @@ class Test_Object_Cache extends WP_UnitTestCase {
 
 	public function test_request_preload() {
 		global $wp_object_cache;
-
-		$_SERVER['HTTP_HOST'] = 'pressjitsu.com';
 
 		/**
 		 * Setup.
@@ -193,7 +191,7 @@ class Test_Object_Cache extends WP_UnitTestCase {
 		wp_cache_get( 'home' );
 		$this->assertRedisCalls( 'get', 1 );
 
-		unset( $_SERVER['REQUEST_URI'], $_SERVER['HTTP_HOST'] );
+		$_SERVER['REQUEST_URI'] = '';
 	}
 
 	public function test_preload_before_flush() {
@@ -300,8 +298,97 @@ class Test_Object_Cache extends WP_UnitTestCase {
 		$this->assertRedisCalls( 'get', 0 );
 
 		global $wp_object_cache;
-
 		$wp_object_cache->save_preloads( 'hash' );
+
 		$this->assertEmpty( wp_cache_get( 'hash', 'pj-preload' ) );
+	}
+
+	public function test_multisite() {
+		global $wp_object_cache;
+
+		wp_cache_add_global_groups( 'global' );
+
+		wp_cache_add( 'hit', 'global', 'global' );
+
+		$site_1 = get_current_site()->blog_id;
+		$site_2 = wpmu_create_blog( wp_generate_password( 12, false ), '/', 'Site 2', 1 );
+		$site_3 = wpmu_create_blog( wp_generate_password( 12, false ), '/', 'Site 3', 1 );
+
+		foreach ( array( $site_1, $site_2, $site_3 ) as $site ) {
+			switch_to_blog( $site );
+
+			$this->redis_spy->_reset();
+
+			wp_cache_add( 'hit', "_$site" );
+			wp_cache_add( 'hit', $site, 'this' );
+
+			// Preheated
+			$this->assertEquals( 'global', wp_cache_get( 'hit', 'global' ) );
+			$this->assertEquals( "_$site", wp_cache_get( 'hit' ) );
+			$this->assertEquals( $site, wp_cache_get( 'hit', 'this' ) );
+
+			$this->assertRedisCalls( 'get', 0 );
+
+			$wp_object_cache->cache = array();
+
+			// Fetched
+			$this->assertEquals( 'global', wp_cache_get( 'hit', 'global' ) );
+			$this->assertEquals( "_$site", wp_cache_get( 'hit' ) );
+			$this->assertEquals( $site, wp_cache_get( 'hit', 'this' ) );
+
+			$this->assertRedisCalls( 'get', 3 );
+
+			$wp_object_cache->cache = array();
+
+			wp_cache_get( 'hit', 'global' );
+		}
+
+		switch_to_blog( $site_1 );
+	}
+
+	public function test_multisite_preloads() {
+		global $wp_object_cache;
+
+		wp_cache_add_global_groups( 'global' );
+
+		wp_cache_add( 'hit', 'global', 'global' );
+
+		$site_1 = get_current_site()->blog_id;
+		$site_2 = wpmu_create_blog( wp_generate_password( 12, false ), '/', 'Site 2', 1 );
+
+		switch_to_blog( $site_1 );
+
+		wp_cache_add( 'hit', $site_1, 'this' );
+
+		wp_cache_get( 'hit', 'this' );
+		wp_cache_get( 'hit', 'global' );
+
+		$wp_object_cache->save_preloads( $site_1 );
+
+		$wp_object_cache->cache = array();
+		$wp_object_cache->to_preload = array();
+
+		switch_to_blog( $site_2 );
+
+		$wp_object_cache->preload( $site_2 );
+		$this->redis_spy->_reset();
+
+		$this->assertEquals( 'global', wp_cache_get( 'hit', 'global' ) );
+		$this->assertFalse( wp_cache_get( 'hit', 'this' ) );
+
+		$this->assertRedisCalls( 'get', 2 );
+
+		switch_to_blog( $site_1 );
+
+		$wp_object_cache->cache = array();
+		$wp_object_cache->to_preload = array();
+
+		$wp_object_cache->preload( $site_1 );
+		$this->redis_spy->_reset();
+
+		$this->assertEquals( 'global', wp_cache_get( 'hit', 'global' ) );
+		$this->assertEquals( $site_1, wp_cache_get( 'hit', 'this' ) );
+
+		$this->assertRedisCalls( 'get', 0 );
 	}
 }
