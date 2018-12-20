@@ -31,3 +31,7 @@ Specify `WP_REDIS_BACKEND_HOST`, `WP_REDIS_BACKEND_PORT`, and `WP_REDIS_BACKEND_
 ### Prefixing Cache Keys ###
 
 The constant `WP_CACHE_KEY_SALT` is provided to add a prefix to all cache keys used by the plugin. If running two single instances of WordPress from the same Redis instance, this constant could be used to avoid overlap in cache keys. Note that special handling is not needed for WordPress Multisite.
+
+## Support
+
+Support for this plugin can be had over at support@pressjitsu.com
