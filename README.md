@@ -2,6 +2,12 @@
 
 A highly efficient, predictive and unit tested WordPress object cache backend that implements all available methods using the Redis PECL library.
 
+# Why is this fork better?
+
+- Preloads known cache keys via a single `mget()` call with lazy unserialization
+- Further microoptimized routines makes this the **fastest** Redis object cache implementation out there
+- Unit-tested with 100% effective target coverage
+
 ## Authors
 
 * Pressjitsu, Inc.

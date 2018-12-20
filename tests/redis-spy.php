@@ -13,7 +13,7 @@ class Redis_Spy {
 	}
 
 	public function _reset() {
-		$this->counts = array();
+		$this->calls = array();
 	}
 
 	public function __call( $method, $arguments ) {

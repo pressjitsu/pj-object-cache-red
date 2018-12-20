@@ -389,6 +389,11 @@ class WP_Object_Cache {
 		) ) );
 
 		$this->preload( $request_hash );
+
+		if ( ! defined( 'DOING_TESTS' ) && DOING_TESTS ) {
+			return $request_hash;
+		}
+
 		register_shutdown_function( array( $this, 'save_preloads' ), $request_hash );
 	}
 
@@ -465,7 +470,7 @@ class WP_Object_Cache {
 	 * @param   int    $expiration     The expiration time, defaults to 0.
 	 * @return  bool                   Returns TRUE on success or FALSE on failure.
 	 */
-	protected function replace( $_key, $value, $group, $expiration = 0 ) {
+	public function replace( $_key, $value, $group, $expiration = 0 ) {
 		list( $key, $redis_key ) = $this->build_key( $_key, $group );
 
 		// If group is a non-Redis group, save to internal cache, not Redis
@@ -474,7 +479,7 @@ class WP_Object_Cache {
 				return false;
 			}
 		} else {
-			if ( $this->redis->exists( $redis_key ) ) {
+			if ( ! $this->redis->exists( $redis_key ) ) {
 				return false;
 			}
 		}
@@ -729,23 +734,6 @@ class WP_Object_Cache {
 
 		$local_key = $prefix . $key;
 		return array( $local_key, WP_CACHE_KEY_SALT . "$prefix$group:$key" );
-	}
-
-	/**
-	 * Convert data types when using Redis MGET
-	 *
-	 * When requesting multiple keys, those not found in cache are assigned the value null upon return.
-	 * Expected value in this case is false, so we convert
-	 *
-	 * @param   string  $value  Value to possibly convert
-	 * @return  string          Converted value
-	 */
-	protected function filter_redis_get_multi( $value ) {
-		if ( is_null( $value ) ) {
-			$value = false;
-		}
-
-		return $value;
 	}
 
 	/**
