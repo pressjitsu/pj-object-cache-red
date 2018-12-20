@@ -8,6 +8,8 @@ A highly efficient, predictive and unit tested WordPress object cache backend th
 - Further microoptimized routines makes this the **fastest** Redis object cache implementation out there
 - Unit-tested with 100% effective target coverage
 
+For more information check out https://pressjitsu.com/blog/redis-object-cache-wordpress/
+
 ## Authors
 
 * Pressjitsu, Inc.
