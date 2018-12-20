@@ -273,4 +273,35 @@ class Test_Object_Cache extends WP_UnitTestCase {
 		$this->assertRedisCalls( 'exists', 2 );
 		$this->assertRedisCalls( 'get', 1 );
 	}
+
+	public function test_suspend() {
+		wp_suspend_cache_addition( true );
+
+		wp_cache_add( 'hit', '1' );
+
+		$this->assertRedisCalls( 'set', 0 );
+
+		wp_suspend_cache_addition( false );
+	}
+
+	public function test_non_persistent() {
+		wp_cache_add_non_persistent_groups( 'this' );
+
+		wp_cache_add( 'hit', '1', 'this' );
+		wp_cache_incr( 'incr', 1, 'this' );
+		wp_cache_decr( 'decr', 1, 'this' );
+
+		$this->assertEquals( '1', wp_cache_get( 'hit', 'this' ) );
+		$this->assertEquals(  1, wp_cache_get( 'incr', 'this' ) );
+		$this->assertEquals( -1, wp_cache_get( 'decr', 'this' ) );
+
+		$this->assertRedisCalls( 'set', 0 );
+		$this->assertRedisCalls( 'incrBy', 0 );
+		$this->assertRedisCalls( 'get', 0 );
+
+		global $wp_object_cache;
+
+		$wp_object_cache->save_preloads( 'hash' );
+		$this->assertEmpty( wp_cache_get( 'hash', 'pj-preload' ) );
+	}
 }
