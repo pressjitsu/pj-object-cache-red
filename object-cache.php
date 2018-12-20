@@ -258,7 +258,7 @@ class WP_Object_Cache {
 
 	private $to_unserialize = array();
 
-	private $to_preload = array();
+	public $to_preload = array();
 
 	/**
 	 * List of global groups.
@@ -503,10 +503,15 @@ class WP_Object_Cache {
 			}
 
 			unset( $this->cache[ $group ][ $key ] );
+			unset( $this->to_preload[ $group ][ $key ] );
+			unset( $this->to_unserialize[ $redis_key ] );
 			return true;
 		}
 
 		unset( $this->cache[ $group ][ $key ] );
+		unset( $this->to_preload[ $group ][ $key ] );
+		unset( $this->to_unserialize[ $redis_key ] );
+
 		return (bool) $this->redis->delete( $redis_key );
 	}
 
@@ -517,6 +522,8 @@ class WP_Object_Cache {
 	 */
 	public function flush() {
 		$this->cache = array();
+		$this->to_preload = array();
+		$this->to_unserialize = array();
 
 		if ( $this->can_redis() ) {
 			$this->redis->flushDb();

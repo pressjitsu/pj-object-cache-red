@@ -149,17 +149,23 @@ class Test_Object_Cache extends WP_UnitTestCase {
 		$request_hash = $wp_object_cache->maybe_preload();
 
 		wp_cache_set( 'home', '1' );
+		wp_cache_get( 'home' );
 
 		$wp_object_cache->save_preloads( $request_hash );
+
 		$wp_object_cache->cache = array();
+		$wp_object_cache->to_preload = array();
 
 		$_SERVER['REQUEST_URI'] = '/about/';
 		$request_hash = $wp_object_cache->maybe_preload();
 
 		wp_cache_set( 'about', '1' );
+		wp_cache_get( 'about' );
 
 		$wp_object_cache->save_preloads( $request_hash );
+
 		$wp_object_cache->cache = array();
+		$wp_object_cache->to_preload = array();
 
 		/**
 		 * Test.
@@ -169,21 +175,22 @@ class Test_Object_Cache extends WP_UnitTestCase {
 
 		$this->redis_spy->_reset();
 
-		wp_cache_get( 'about', '1' );
+		wp_cache_get( 'about' );
 		$this->assertRedisCalls( 'get', 1 );
-		wp_cache_get( 'home', '1' );
+		wp_cache_get( 'home' );
 		$this->assertRedisCalls( 'get', 1 );
 
 		$wp_object_cache->cache = array();
+		$wp_object_cache->to_preload = array();
 
 		$_SERVER['REQUEST_URI'] = '/about/';
 		$wp_object_cache->maybe_preload();
 
 		$this->redis_spy->_reset();
 
-		wp_cache_get( 'about', '1' );
+		wp_cache_get( 'about' );
 		$this->assertRedisCalls( 'get', 0 );
-		wp_cache_get( 'home', '1' );
+		wp_cache_get( 'home' );
 		$this->assertRedisCalls( 'get', 1 );
 
 		unset( $_SERVER['REQUEST_URI'], $_SERVER['HTTP_HOST'] );
