@@ -390,7 +390,7 @@ class WP_Object_Cache {
 
 		$this->preload( $request_hash );
 
-		if ( ! defined( 'DOING_TESTS' ) && DOING_TESTS ) {
+		if ( defined( 'DOING_TESTS' ) && DOING_TESTS ) {
 			return $request_hash;
 		}
 

@@ -140,12 +140,12 @@ class Test_Object_Cache extends WP_UnitTestCase {
 	public function test_request_preload() {
 		global $wp_object_cache;
 
-		$_REQUEST['HTTP_HOST'] = 'pressjitsu.com';
+		$_SERVER['HTTP_HOST'] = 'pressjitsu.com';
 
 		/**
 		 * Setup.
 		 */
-		$_REQUEST['REQUEST_URI'] = '/home/';
+		$_SERVER['REQUEST_URI'] = '/home/';
 		$request_hash = $wp_object_cache->maybe_preload();
 
 		wp_cache_set( 'home', '1' );
@@ -153,7 +153,7 @@ class Test_Object_Cache extends WP_UnitTestCase {
 		$wp_object_cache->save_preloads( $request_hash );
 		$wp_object_cache->cache = array();
 
-		$_REQUEST['REQUEST_URI'] = '/about/';
+		$_SERVER['REQUEST_URI'] = '/about/';
 		$request_hash = $wp_object_cache->maybe_preload();
 
 		wp_cache_set( 'about', '1' );
@@ -164,7 +164,7 @@ class Test_Object_Cache extends WP_UnitTestCase {
 		/**
 		 * Test.
 		 */
-		$_REQUEST['REQUEST_URI'] = '/home/';
+		$_SERVER['REQUEST_URI'] = '/home/';
 		$wp_object_cache->maybe_preload();
 
 		$this->redis_spy->_reset();
@@ -176,7 +176,7 @@ class Test_Object_Cache extends WP_UnitTestCase {
 
 		$wp_object_cache->cache = array();
 
-		$_REQUEST['REQUEST_URI'] = '/about/';
+		$_SERVER['REQUEST_URI'] = '/about/';
 		$wp_object_cache->maybe_preload();
 
 		$this->redis_spy->_reset();
@@ -186,7 +186,7 @@ class Test_Object_Cache extends WP_UnitTestCase {
 		wp_cache_get( 'home', '1' );
 		$this->assertRedisCalls( 'get', 1 );
 
-		unset( $_REQUEST['REQUEST_URI'], $_REQUEST['HTTP_HOST'] );
+		unset( $_SERVER['REQUEST_URI'], $_SERVER['HTTP_HOST'] );
 	}
 
 	public function test_preload_before_flush() {
