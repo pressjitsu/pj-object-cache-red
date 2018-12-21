@@ -17,8 +17,8 @@ For more information check out https://pressjitsu.com/blog/redis-object-cache-wo
 * Erick Hitter
 
 ## Installation
-1. Install and configure Redis. There is a good tutorial [here](http://www.saltwebsites.com/2012/install-redis-245-service-centos-6).
-2. Install the [Redis PECL module](http://pecl.php.net/package/redis).
+1. Install and configure Redis. There is a good tutorial [here](https://www.digitalocean.com/community/tutorials/how-to-install-and-secure-redis-on-debian-9).
+2. Install the [Redis PECL module](http://pecl.php.net/package/redis) or compile from [source](https://github.com/phpredis/phpredis).
 3. Add `object-cache.php` to the wp-content directory. It is a drop-in file, not a plugin, so it belongs in the wp-content directory, not the plugins directory.
 4. By default, the script will connect to Redis at 127.0.0.1:6379. See the *Connecting to Redis* section for further options.
 
