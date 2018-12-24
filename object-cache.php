@@ -5,6 +5,11 @@
  * Version:     1.0
  */
 
+// Check if Redis class is installed
+if ( ! class_exists( 'Redis' ) ) {
+	return;
+}
+
 /**
  * Adds a value to cache.
  *
