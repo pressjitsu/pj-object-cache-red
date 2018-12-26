@@ -84,10 +84,10 @@ class Test_Object_Cache extends WP_UnitTestCase {
 
 		$this->assertEquals( array(
 			'group2' => array(
-				'1:hit' => '2',
+				'hit' => '2',
 			),
 			'default' => array(
-				'1:hit' => '1',
+				'hit' => '1',
 			)
 		), $result );
 
@@ -126,10 +126,10 @@ class Test_Object_Cache extends WP_UnitTestCase {
 
 		$this->assertEquals( array(
 			'group2' => array(
-				'1:hit' => '2',
+				'hit' => '2',
 			),
 			'default' => array(
-				'1:hit' => '1',
+				'hit' => '1',
 			)
 		), $result );
 
@@ -292,10 +292,20 @@ class Test_Object_Cache extends WP_UnitTestCase {
 		$this->assertEquals( '1', wp_cache_get( 'hit', 'this' ) );
 		$this->assertEquals(  1, wp_cache_get( 'incr', 'this' ) );
 		$this->assertEquals( -1, wp_cache_get( 'decr', 'this' ) );
+		$this->assertEquals( array(
+			'this' => array(
+				'hit' => '1',
+			)
+		), wp_cache_get_multi( array( 'this' => array( 'hit' ) ) ) );
+
+		wp_cache_replace( 'hit', '2', 'this' );
+		wp_cache_delete( 'hit', 'this' );
 
 		$this->assertRedisCalls( 'set', 0 );
 		$this->assertRedisCalls( 'incrBy', 0 );
 		$this->assertRedisCalls( 'get', 0 );
+		$this->assertRedisCalls( 'mget', 0 );
+		$this->assertRedisCalls( 'delete', 0 );
 
 		global $wp_object_cache;
 		$wp_object_cache->save_preloads( 'hash' );
@@ -388,6 +398,29 @@ class Test_Object_Cache extends WP_UnitTestCase {
 
 		$this->assertEquals( 'global', wp_cache_get( 'hit', 'global' ) );
 		$this->assertEquals( $site_1, wp_cache_get( 'hit', 'this' ) );
+
+		$this->assertRedisCalls( 'get', 0 );
+	}
+
+	public function test_preload_incr_decr() {
+		global $wp_object_cache;
+
+		wp_cache_incr( 'incr' );
+		wp_cache_get( 'incr' );
+
+		wp_cache_incr( 'decr' );
+		wp_cache_get( 'decr' );
+
+		$wp_object_cache->save_preloads( 'hash' );
+
+		$wp_object_cache->cache = array();
+		$wp_object_cache->to_preload = array();
+
+		$wp_object_cache->preload( 'hash' );
+		$this->redis_spy->_reset();
+
+		$this->assertEquals( 1, wp_cache_get( 'incr' ) );
+		$this->assertEquals( -1, wp_cache_get( 'decr' ) );
 
 		$this->assertRedisCalls( 'get', 0 );
 	}
