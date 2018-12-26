@@ -570,12 +570,12 @@ class WP_Object_Cache {
 		// Fetch from Redis
 		$value = $this->redis->get( $redis_key );
 
-		if ( ! is_string( $value ) ) {
+		if ( ! is_string( $value ) && ! is_numeric( $value ) ) {
 			$this->cache[ $group ][ $key ] = false;
 			return false;
 		}
 
-		$value = unserialize( $value );
+		$value = is_string( $value ) ? unserialize( $value ) : $value;
 		$this->cache[ $group ][ $key ] = $value;
 		return $value;
 	}
@@ -644,7 +644,7 @@ class WP_Object_Cache {
 					$this->to_preload[ $group ][ $key ] = true;
 					$value = unserialize( $value );
 				}
-			} else {
+			} elseif ( ! is_numeric( $value ) ) {
 				$value = false;
 			}
 
@@ -677,6 +677,8 @@ class WP_Object_Cache {
 		if ( in_array( $group, $this->no_redis_groups ) || ! $this->can_redis() ) {
 			return true;
 		}
+		
+		$value = is_numeric( $value ) ? $value : serialize( $value );
 
 		// Save to Redis
 		if ( $expiration ) {
