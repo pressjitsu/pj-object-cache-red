@@ -682,9 +682,9 @@ class WP_Object_Cache {
 
 		// Save to Redis
 		if ( $expiration ) {
-			$this->redis->setex( $redis_key, $expiration, serialize( $value ) );
+			$this->redis->setex( $redis_key, $expiration, $value );
 		} else {
-			$this->redis->set( $redis_key, serialize( $value ) );
+			$this->redis->set( $redis_key, $value );
 		}
 
 		return true;
