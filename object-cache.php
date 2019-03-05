@@ -2,7 +2,9 @@
 /**
  * Plugin Name: Pressjitsu Redis Object Cache
  * Author:      Pressjitsu, Inc., Eric Mann & Erick Hitter
- * Version:     1.0
+ * Version:     1.1
+ *
+ * @package pj-object-cache-red
  */
 
 /**
@@ -16,12 +18,16 @@
  * @param string $group      The group value appended to the $key.
  * @param int    $expiration The expiration time, defaults to 0.
  *
- * @global WP_Object_Cache $wp_object_cache
- *
  * @return bool              Returns TRUE on success or FALSE on failure.
  */
 function wp_cache_add( $key, $value, $group = 'default', $expiration = 0 ) {
+	/**
+	 * WordPress object cache instance.
+	 *
+	 * @var WP_Object_Cache $wp_object_cache
+	 */
 	global $wp_object_cache;
+
 	return $wp_object_cache->add( $key, $value, $group, $expiration );
 }
 
@@ -46,42 +52,54 @@ function wp_cache_close() {
  * @param int    $offset The amount by which to decrement the item's value.
  * @param string $group  The group value appended to the $key.
  *
- * @global WP_Object_Cache $wp_object_cache
- *
  * @return int|bool      Returns item's new value on success or FALSE on failure.
  */
 function wp_cache_decr( $key, $offset = 1, $group = 'default' ) {
+	/**
+	 * WordPress object cache instance.
+	 *
+	 * @var WP_Object_Cache $wp_object_cache
+	 */
 	global $wp_object_cache;
+
 	return $wp_object_cache->decr( $key, $offset, $group );
 }
 
 /**
  * Remove the item from the cache.
  *
- * @param string $key    The key under which to store the value.
- * @param string $group  The group value appended to the $key.
- * @param int    $time   The amount of time the server will wait to delete the item in seconds.
+ * @param string $key   The key under which to store the value.
+ * @param string $group The group value appended to the $key.
+ * @param int    $time  The amount of time the server will wait to delete the item in seconds.
  *
- * @global WP_Object_Cache $wp_object_cache
- *
- * @return bool           Returns TRUE on success or FALSE on failure.
+ * @return bool         Returns TRUE on success or FALSE on failure.
  */
 function wp_cache_delete( $key, $group = 'default', $time = 0 ) {
+	/**
+	 * WordPress object cache instance.
+	 *
+	 * @var WP_Object_Cache $wp_object_cache
+	 */
 	global $wp_object_cache;
+
 	return $wp_object_cache->delete( $key, $group, $time );
 }
 
 /**
  * Invalidate all items in the cache.
  *
- * @param int $delay  Number of seconds to wait before invalidating the items.
+ * @param int $delay Number of seconds to wait before invalidating the items.
  *
- * @global WP_Object_Cache $wp_object_cache
- *
- * @return bool             Returns TRUE on success or FALSE on failure.
+ * @return bool      Returns TRUE on success or FALSE on failure.
  */
 function wp_cache_flush( $delay = 0 ) {
+	/**
+	 * WordPress object cache instance.
+	 *
+	 * @var WP_Object_Cache $wp_object_cache
+	 */
 	global $wp_object_cache;
+
 	return $wp_object_cache->flush( $delay );
 }
 
@@ -90,15 +108,20 @@ function wp_cache_flush( $delay = 0 ) {
  *
  * Gets an object from cache based on $key and $group.
  *
- * @param string      $key        The key under which to store the value.
- * @param string      $group      The group value appended to the $key.
+ * @param string  $key   The key under which to store the value.
+ * @param string  $group The group value appended to the $key.
+ * @param boolean $force Forced get.
  *
- * @global WP_Object_Cache $wp_object_cache
- *
- * @return bool|mixed             Cached object value.
+ * @return bool|mixed    Cached object value.
  */
 function wp_cache_get( $key, $group = 'default', $force = false ) {
+	/**
+	 * WordPress object cache instance.
+	 *
+	 * @var WP_Object_Cache $wp_object_cache
+	 */
 	global $wp_object_cache;
+
 	return $wp_object_cache->get( $key, $group, $force );
 }
 
@@ -111,14 +134,19 @@ function wp_cache_get( $key, $group = 'default', $force = false ) {
  *
  * Mirrors the Memcached Object Cache plugin's argument and return-value formats
  *
- * @param   array       $groups  Array of groups and keys to retrieve
- *
- * @global WP_Object_Cache $wp_object_cache
+ * @param   array   $groups      Array of groups and keys to retrieve.
+ * @param   boolean $unserialize Flag to unserialize.
  *
  * @return  bool|mixed           Array of cached values, keys in the format $group:$key. Non-existent keys false
  */
 function wp_cache_get_multi( $groups, $unserialize = true ) {
+	/**
+	 * WordPress object cache instance.
+	 *
+	 * @var WP_Object_Cache $wp_object_cache
+	 */
 	global $wp_object_cache;
+
 	return $wp_object_cache->get_multi( $groups, $unserialize );
 }
 
@@ -129,25 +157,35 @@ function wp_cache_get_multi( $groups, $unserialize = true ) {
  * @param int    $offset The amount by which to increment the item's value.
  * @param string $group  The group value appended to the $key.
  *
- * @global WP_Object_Cache $wp_object_cache
- *
  * @return int|bool      Returns item's new value on success or FALSE on failure.
  */
 function wp_cache_incr( $key, $offset = 1, $group = 'default' ) {
+	/**
+	 * WordPress object cache instance.
+	 *
+	 * @var WP_Object_Cache $wp_object_cache
+	 */
 	global $wp_object_cache;
+
 	return $wp_object_cache->incr( $key, $offset, $group );
 }
 
 /**
  * Sets up Object Cache Global and assigns it.
  *
- * @global  WP_Object_Cache $wp_object_cache    WordPress Object Cache
- *
- * @return  void
+ * @return void
  */
 function wp_cache_init() {
+	/**
+	 * WordPress object cache instance.
+	 *
+	 * @var WP_Object_Cache $wp_object_cache
+	 */
 	global $wp_object_cache;
+
+	// phpcs:disable WordPress.WP.GlobalVariablesOverride.Prohibited
 	$wp_object_cache = new WP_Object_Cache();
+	// phpcs:enable WordPress.WP.GlobalVariablesOverride.Prohibited
 }
 
 /**
@@ -161,12 +199,16 @@ function wp_cache_init() {
  * @param string $group      The group value appended to the $key.
  * @param int    $expiration The expiration time, defaults to 0.
  *
- * @global WP_Object_Cache $wp_object_cache
- *
  * @return bool              Returns TRUE on success or FALSE on failure.
  */
 function wp_cache_replace( $key, $value, $group = 'default', $expiration = 0 ) {
+	/**
+	 * WordPress object cache instance.
+	 *
+	 * @var WP_Object_Cache $wp_object_cache
+	 */
 	global $wp_object_cache;
+
 	return $wp_object_cache->replace( $key, $value, $group, $expiration );
 }
 
@@ -180,59 +222,78 @@ function wp_cache_replace( $key, $value, $group = 'default', $expiration = 0 ) {
  * @param string $group      The group value appended to the $key.
  * @param int    $expiration The expiration time, defaults to 0.
  *
- * @global WP_Object_Cache $wp_object_cache
- *
  * @return bool              Returns TRUE on success or FALSE on failure.
  */
 function wp_cache_set( $key, $value, $group = 'default', $expiration = 0 ) {
+	/**
+	 * WordPress object cache instance.
+	 *
+	 * @var WP_Object_Cache $wp_object_cache
+	 */
 	global $wp_object_cache;
+
 	return $wp_object_cache->set( $key, $value, $group, $expiration );
 }
 
 /**
- * Switch the interal blog id.
+ * Switch the internal blog id.
  *
  * This changes the blog id used to create keys in blog specific groups.
  *
- * @param  int $_blog_id Blog ID
- *
- * @global WP_Object_Cache $wp_object_cache
+ * @param int $_blog_id Blog ID.
  *
  * @return bool
  */
 function wp_cache_switch_to_blog( $_blog_id ) {
+	/**
+	 * WordPress object cache instance.
+	 *
+	 * @var WP_Object_Cache $wp_object_cache
+	 */
 	global $wp_object_cache;
+
 	return $wp_object_cache->switch_to_blog( $_blog_id );
 }
 
 /**
  * Adds a group or set of groups to the list of Redis groups.
  *
- * @param   string|array $groups     A group or an array of groups to add.
+ * @param string|array $groups A group or an array of groups to add.
  *
- * @global WP_Object_Cache $wp_object_cache
- *
- * @return  void
+ * @return void
  */
 function wp_cache_add_global_groups( $groups ) {
+	/**
+	 * WordPress object cache instance.
+	 *
+	 * @var WP_Object_Cache $wp_object_cache
+	 */
 	global $wp_object_cache;
+
 	$wp_object_cache->add_global_groups( $groups );
 }
 
 /**
  * Adds a group or set of groups to the list of non-Redis groups.
  *
- * @param   string|array $groups     A group or an array of groups to add.
- *
- * @global WP_Object_Cache $wp_object_cache
+ * @param   string|array $groups A group or an array of groups to add.
  *
  * @return  void
  */
 function wp_cache_add_non_persistent_groups( $groups ) {
+	/**
+	 * WordPress object cache instance.
+	 *
+	 * @var WP_Object_Cache $wp_object_cache
+	 */
 	global $wp_object_cache;
+
 	$wp_object_cache->add_non_persistent_groups( $groups );
 }
 
+/**
+ * Class WP_Object_Cache
+ */
 class WP_Object_Cache {
 
 	/**
@@ -256,8 +317,18 @@ class WP_Object_Cache {
 	 */
 	public $cache = array();
 
+	/**
+	 * Items to unserialize.
+	 *
+	 * @var array
+	 */
 	private $to_unserialize = array();
 
+	/**
+	 * Items to preload.
+	 *
+	 * @var array
+	 */
 	public $to_preload = array();
 
 	/**
@@ -265,9 +336,23 @@ class WP_Object_Cache {
 	 *
 	 * @var array
 	 */
-	public $global_groups = array( 'users', 'userlogins', 'usermeta', 'site-options', 'site-lookup', 'blog-lookup', 'blog-details', 'rss' );
+	public $global_groups = array(
+		'users',
+		'userlogins',
+		'usermeta',
+		'site-options',
+		'site-lookup',
+		'blog-lookup',
+		'blog-details',
+		'rss',
+	);
 
-	private $_global_groups;
+	/**
+	 * Private global groups.
+	 *
+	 * @var array|null
+	 */
+	private $private_global_groups;
 
 	/**
 	 * List of groups not saved to Redis.
@@ -304,8 +389,18 @@ class WP_Object_Cache {
 	 */
 	public $cache_misses = 0;
 
+	/**
+	 * Multisite flag.
+	 *
+	 * @var bool
+	 */
 	private $multisite;
 
+	/**
+	 * Stats.
+	 *
+	 * @var array
+	 */
 	public $stats = array();
 
 	/**
@@ -313,16 +408,17 @@ class WP_Object_Cache {
 	 *
 	 * Instantiates the Redis class.
 	 *
-	 * @param   null $persistent_id      To create an instance that persists between requests, use persistent_id to specify a unique ID for the instance.
+	 * @param object $redis_instance To create an instance that persists between requests, use Redis instance.
 	 */
 	public function __construct( $redis_instance = null ) {
 		// Check if Redis class is installed.
 		if ( ! class_exists( 'Redis' ) ) {
 			$this->mark_redis_disconnected();
+
 			return;
 		}
 
-		// General Redis settings
+		// General Redis settings.
 		$redis = array(
 			'host' => '127.0.0.1',
 			'port' => 6379,
@@ -371,32 +467,52 @@ class WP_Object_Cache {
 			define( 'WP_CACHE_KEY_SALT', '' );
 		}
 
-		$this->multisite = is_multisite();
-		$this->blog_prefix = $this->multisite ? get_current_blog_id() . ':' : '';
-		$this->_global_groups = array_flip( $this->global_groups );
+		$this->multisite             = is_multisite();
+		$this->blog_prefix           = $this->multisite ? get_current_blog_id() . ':' : '';
+		$this->private_global_groups = array_flip( $this->global_groups );
 
 		$this->maybe_preload();
 	}
 
+	/**
+	 * Mark that Redis is disconnected.
+	 */
 	protected function mark_redis_disconnected() {
-		// When Redis is unavailable, fall back to the internal back by forcing all groups to be "no redis" groups
+		// When Redis is unavailable, fall back to the internal back by forcing all groups to be "no redis" groups.
 		$this->no_redis_groups = array_unique( array_merge( $this->no_redis_groups, $this->global_groups ) );
 		$this->redis_connected = false;
 	}
 
+	/**
+	 * Maybe preload items.
+	 *
+	 * @return string|null
+	 */
 	public function maybe_preload() {
 		if ( ! $this->can_redis() || empty( $_SERVER['REQUEST_URI'] ) ) {
-			return;
+			return null;
 		}
 
 		if ( defined( 'WP_CLI' ) && WP_CLI ) {
-			return;
+			return null;
 		}
 
-		$request_hash = md5( json_encode( array(
-			$_SERVER['HTTP_HOST'],
-			$_SERVER['REQUEST_URI'],
-		) ) );
+		$request_hash = md5(
+			wp_json_encode(
+				array(
+					// phpcs:disable WordPress.Security.ValidatedSanitizedInput.MissingUnslash
+					filter_var(
+						isset( $_SERVER['HTTP_HOST'] ) ? $_SERVER['HTTP_HOST'] : '',
+						FILTER_SANITIZE_STRING
+					),
+					filter_var(
+						isset( $_SERVER['REQUEST_URI'] ) ? $_SERVER['REQUEST_URI'] : '',
+						FILTER_SANITIZE_STRING
+					),
+					// phpcs:enable WordPress.Security.ValidatedSanitizedInput.MissingUnslash
+				)
+			)
+		);
 
 		$this->preload( $request_hash );
 
@@ -405,8 +521,15 @@ class WP_Object_Cache {
 		}
 
 		register_shutdown_function( array( $this, 'save_preloads' ), $request_hash );
+
+		return null;
 	}
 
+	/**
+	 * Preload items.
+	 *
+	 * @param string $hash Hash.
+	 */
 	public function preload( $hash ) {
 		$keys = $this->get( $hash, 'pj-preload' );
 		if ( is_array( $keys ) ) {
@@ -414,19 +537,24 @@ class WP_Object_Cache {
 		}
 	}
 
+	/**
+	 * Save preloads.
+	 *
+	 * @param string $hash Hash.
+	 */
 	public function save_preloads( $hash ) {
 		$keys = array();
 
 		foreach ( $this->to_preload as $group => $_keys ) {
-			if ( $group === 'pj-preload' ) {
+			if ( 'pj-preload' === $group ) {
 				continue;
 			}
 
-			if ( in_array( $group, $this->no_redis_groups ) ) {
+			if ( in_array( $group, $this->no_redis_groups, true ) ) {
 				continue;
 			}
 
-			$_keys = array_keys( $_keys );
+			$_keys          = array_keys( $_keys );
 			$keys[ $group ] = $_keys;
 		}
 
@@ -448,11 +576,12 @@ class WP_Object_Cache {
 	 * If the specified key already exists, the value is not stored and the function
 	 * returns false.
 	 *
-	 * @param   string $key            The key under which to store the value.
-	 * @param   mixed  $value          The value to store.
-	 * @param   string $group          The group value appended to the $key.
-	 * @param   int    $expiration     The expiration time, defaults to 0.
-	 * @return  bool                   Returns TRUE on success or FALSE on failure.
+	 * @param   string $_key       The key under which to store the value.
+	 * @param   mixed  $value      The value to store.
+	 * @param   string $group      The group value appended to the $key.
+	 * @param   int    $expiration The expiration time, defaults to 0.
+	 *
+	 * @return  bool               Returns TRUE on success or FALSE on failure.
 	 */
 	public function add( $_key, $value, $group, $expiration = 0 ) {
 		if ( wp_suspend_cache_addition() ) {
@@ -474,17 +603,18 @@ class WP_Object_Cache {
 	 * If the specified key doesn't exist, the value is not stored and the function
 	 * returns false.
 	 *
-	 * @param   string $key            The key under which to store the value.
-	 * @param   mixed  $value          The value to store.
-	 * @param   string $group          The group value appended to the $key.
-	 * @param   int    $expiration     The expiration time, defaults to 0.
-	 * @return  bool                   Returns TRUE on success or FALSE on failure.
+	 * @param   string $_key       The key under which to store the value.
+	 * @param   mixed  $value      The value to store.
+	 * @param   string $group      The group value appended to the $key.
+	 * @param   int    $expiration The expiration time, defaults to 0.
+	 *
+	 * @return  bool               Returns TRUE on success or FALSE on failure.
 	 */
 	public function replace( $_key, $value, $group, $expiration = 0 ) {
 		list( $key, $redis_key ) = $this->build_key( $_key, $group );
 
-		// If group is a non-Redis group, save to internal cache, not Redis
-		if ( in_array( $group, $this->no_redis_groups ) || ! $this->can_redis() ) {
+		// If group is a non-Redis group, save to internal cache, not Redis.
+		if ( in_array( $group, $this->no_redis_groups, true ) || ! $this->can_redis() ) {
 			if ( ! isset( $this->cache[ $group ], $this->cache[ $group ][ $key ] ) ) {
 				return false;
 			}
@@ -500,14 +630,15 @@ class WP_Object_Cache {
 	/**
 	 * Remove the item from the cache.
 	 *
-	 * @param   string $key        The key under which to store the value.
-	 * @param   string $group      The group value appended to the $key.
-	 * @return  bool               Returns TRUE on success or FALSE on failure.
+	 * @param   string $_key  The key under which to store the value.
+	 * @param   string $group The group value appended to the $key.
+	 *
+	 * @return  bool          Returns TRUE on success or FALSE on failure.
 	 */
 	public function delete( $_key, $group ) {
 		list( $key, $redis_key ) = $this->build_key( $_key, $group );
 
-		if ( in_array( $group, $this->no_redis_groups ) || ! $this->can_redis() ) {
+		if ( in_array( $group, $this->no_redis_groups, true ) || ! $this->can_redis() ) {
 			if ( ! isset( $this->cache[ $group ], $this->cache[ $group ][ $key ] ) ) {
 				return false;
 			}
@@ -515,6 +646,7 @@ class WP_Object_Cache {
 			unset( $this->cache[ $group ][ $key ] );
 			unset( $this->to_preload[ $group ][ $key ] );
 			unset( $this->to_unserialize[ $redis_key ] );
+
 			return true;
 		}
 
@@ -531,8 +663,8 @@ class WP_Object_Cache {
 	 * @return  bool
 	 */
 	public function flush() {
-		$this->cache = array();
-		$this->to_preload = array();
+		$this->cache          = array();
+		$this->to_preload     = array();
 		$this->to_unserialize = array();
 
 		if ( $this->can_redis() ) {
@@ -547,9 +679,11 @@ class WP_Object_Cache {
 	 *
 	 * Gets an object from cache based on $key and $group.
 	 *
-	 * @param   string        $key        The key under which to store the value.
-	 * @param   string        $group      The group value appended to the $key.
-	 * @return  bool|mixed                Cached object value.
+	 * @param   string  $_key  The key under which to store the value.
+	 * @param   string  $group The group value appended to the $key.
+	 * @param   boolean $force Forced get.
+	 *
+	 * @return  bool|mixed     Cached object value.
 	 */
 	public function get( $_key, $group = 'default', $force = false ) {
 		list( $key, $redis_key ) = $this->build_key( $_key, $group );
@@ -568,20 +702,25 @@ class WP_Object_Cache {
 			return is_object( $value ) ? clone $value : $value;
 		}
 
-		if ( in_array( $group, $this->no_redis_groups ) || ! $this->can_redis() ) {
+		if ( in_array( $group, $this->no_redis_groups, true ) || ! $this->can_redis() ) {
 			return false;
 		}
 
-		// Fetch from Redis
+		// Fetch from Redis.
 		$value = $this->redis->get( $redis_key );
 
 		if ( ! is_string( $value ) ) {
 			$this->cache[ $group ][ $key ] = false;
+
 			return false;
 		}
 
+		// phpcs:disable WordPress.PHP.DiscouragedPHPFunctions.serialize_unserialize
 		$value = is_numeric( $value ) ? $value : unserialize( $value );
+		// phpcs:enable WordPress.PHP.DiscouragedPHPFunctions.serialize_unserialize
+
 		$this->cache[ $group ][ $key ] = $value;
+
 		return $value;
 	}
 
@@ -592,21 +731,23 @@ class WP_Object_Cache {
 	 *
 	 * Usage: array( 'group0' => array( 'key0', 'key1', 'key2', ), 'group1' => array( 'key0' ) )
 	 *
-	 * @param   array                           $groups  Array of groups and keys to retrieve
-	 * @return  bool|mixed                               Array of cached values, keys in the format $group:$key. Non-existent keys null.
+	 * @param   array   $groups      Array of groups and keys to retrieve.
+	 * @param   boolean $unserialize Unserialize flag.
+	 *
+	 * @return  bool|mixed           Array of cached values, keys in the format $group:$key. Non-existent keys null.
 	 */
 	public function get_multi( $groups, $unserialize = true ) {
 		if ( empty( $groups ) || ! is_array( $groups ) ) {
 			return false;
 		}
 
-		// Retrieve requested caches and reformat results to mimic Memcached Object Cache's output
-		$cache = array();
+		// Retrieve requested caches and reformat results to mimic Memcached Object Cache's output.
+		$cache      = array();
 		$fetch_keys = array();
-		$map = array();
+		$map        = array();
 
 		foreach ( $groups as $group => $keys ) {
-			if ( in_array( $group, $this->no_redis_groups ) || ! $this->can_redis() ) {
+			if ( in_array( $group, $this->no_redis_groups, true ) || ! $this->can_redis() ) {
 				foreach ( $keys as $_key ) {
 					list( $key, $redis_key ) = $this->build_key( $_key, $group );
 					$cache[ $group ][ $key ] = $this->get( $_key, $group );
@@ -627,19 +768,19 @@ class WP_Object_Cache {
 					continue;
 				}
 
-				// Fetch these from Redis
+				// Fetch these from Redis.
 				$map[ $redis_key ] = array( $group, $key );
-				$fetch_keys[] = $redis_key;
+				$fetch_keys[]      = $redis_key;
 			}
 		}
 
-		// Nothing else to fetch
+		// Nothing else to fetch.
 		if ( empty( $fetch_keys ) ) {
 			return $cache;
 		}
 
 		$results = $this->redis->mget( $fetch_keys );
-		foreach( array_combine( $fetch_keys, $results ) as $redis_key => $value ) {
+		foreach ( array_combine( $fetch_keys, $results ) as $redis_key => $value ) {
 			list( $group, $key ) = $map[ $redis_key ];
 
 			if ( is_string( $value ) ) {
@@ -647,13 +788,16 @@ class WP_Object_Cache {
 					$this->to_unserialize[ $redis_key ] = true;
 				} elseif ( $unserialize ) {
 					$this->to_preload[ $group ][ $key ] = true;
+					// phpcs:disable WordPress.PHP.DiscouragedPHPFunctions.serialize_unserialize
 					$value = is_numeric( $value ) ? $value : unserialize( $value );
+					// phpcs:enable WordPress.PHP.DiscouragedPHPFunctions.serialize_unserialize
 				}
 			} else {
 				$value = false;
 			}
 
-			$this->cache[ $group ][ $key ] = $cache[ $group ][ $key ] = $value;
+			$cache[ $group ][ $key ]       = $value;
+			$this->cache[ $group ][ $key ] = $value;
 		}
 
 		return $cache;
@@ -664,10 +808,11 @@ class WP_Object_Cache {
 	 *
 	 * The value is set whether or not this key already exists in Redis.
 	 *
-	 * @param   string $key        The key under which to store the value.
+	 * @param   string $_key       The key under which to store the value.
 	 * @param   mixed  $value      The value to store.
 	 * @param   string $group      The group value appended to the $key.
 	 * @param   int    $expiration The expiration time, defaults to 0.
+	 *
 	 * @return  bool               Returns TRUE on success or FALSE on failure.
 	 */
 	public function set( $_key, $value, $group = 'default', $expiration = 0 ) {
@@ -679,13 +824,15 @@ class WP_Object_Cache {
 
 		$this->cache[ $group ][ $key ] = $value;
 
-		if ( in_array( $group, $this->no_redis_groups ) || ! $this->can_redis() ) {
+		if ( in_array( $group, $this->no_redis_groups, true ) || ! $this->can_redis() ) {
 			return true;
 		}
-		
-		$value = is_numeric( $value ) ? $value : serialize( $value );
 
-		// Save to Redis
+		// phpcs:disable WordPress.PHP.DiscouragedPHPFunctions.serialize_serialize
+		$value = is_numeric( $value ) ? $value : serialize( $value );
+		// phpcs:enable WordPress.PHP.DiscouragedPHPFunctions.serialize_serialize
+
+		// Save to Redis.
 		if ( $expiration ) {
 			$this->redis->setex( $redis_key, $expiration, $value );
 		} else {
@@ -698,40 +845,44 @@ class WP_Object_Cache {
 	/**
 	 * Increment a Redis counter by the amount specified
 	 *
-	 * @param  string $key
-	 * @param  int    $offset
-	 * @param  string $group
+	 * @param  string $_key   Cache key.
+	 * @param  int    $offset Offset.
+	 * @param  string $group  Cache group.
+	 *
 	 * @return bool
 	 */
-	public function incr( $_key, $offset = 1, $group ) {
+	public function incr( $_key, $offset = 1, $group = null ) {
 		list( $key, $redis_key ) = $this->build_key( $_key, $group );
 
-		if ( in_array( $group, $this->no_redis_groups ) || ! $this->can_redis() ) {
-			// Consistent with the Redis behavior (start from 0 if not exists)
+		if ( in_array( $group, $this->no_redis_groups, true ) || ! $this->can_redis() ) {
+			// Consistent with the Redis behavior ( start from 0 if not exists ).
 			if ( ! isset( $this->cache[ $group ][ $key ] ) ) {
 				$this->cache[ $group ][ $key ] = 0;
 			}
 
 			$this->cache[ $group ][ $key ] += $offset;
+
 			return true;
 		}
 
-		// Save to Redis
-		$value = $this->redis->incrBy( $redis_key, $offset );
+		// Save to Redis.
+		$value                         = $this->redis->incrBy( $redis_key, $offset );
 		$this->cache[ $group ][ $key ] = $value;
+
 		return $value;
 	}
 
 	/**
-	 * Decrement a Redis counter by the amount specified
+	 * Decrement a Redis counter by the amount specified.
 	 *
-	 * @param  string $key
-	 * @param  int    $offset
-	 * @param  string $group
+	 * @param  string $_key   Cache key.
+	 * @param  int    $offset Offset.
+	 * @param  string $group  Cache group.
+	 *
 	 * @return bool
 	 */
-	public function decr( $key, $offset = 1, $group = 'default' ) {
-		return $this->incr( $key, $offset * -1, $group );
+	public function decr( $_key, $offset = 1, $group = 'default' ) {
+		return $this->incr( $_key, $offset * - 1, $group );
 	}
 
 	/**
@@ -740,26 +891,26 @@ class WP_Object_Cache {
 	 * @author  Ryan Boren   This function is inspired by the original WP Memcached Object cache.
 	 * @link    http://wordpress.org/extend/plugins/memcached/
 	 *
-	 * @param   string $key        The key under which to store the value.
-	 * @param   string $group      The group value appended to the $key.
+	 * @param   string $key   The key under which to store the value.
+	 * @param   string $group The group value appended to the $key.
 	 *
 	 * @return  array
 	 */
 	public function build_key( $key, $group = 'default' ) {
 		$prefix = '';
-		if ( ! isset( $this->_global_groups[ $group ] ) ) {
+		if ( ! isset( $this->private_global_groups[ $group ] ) ) {
 			$prefix = $this->blog_prefix;
 		}
 
 		$local_key = $prefix . $key;
+
 		return array( $local_key, WP_CACHE_KEY_SALT . "$prefix$group:$key" );
 	}
 
 	/**
-	 * In multisite, switch blog prefix when switching blogs
+	 * In multisite, switch blog prefix when switching blogs.
 	 *
-	 * @param int $_blog_id
-	 * @return bool
+	 * @param int $blog_id Blog id.
 	 */
 	public function switch_to_blog( $blog_id ) {
 		$this->blog_prefix = $this->multisite ? $blog_id . ':' : '';
@@ -779,7 +930,7 @@ class WP_Object_Cache {
 			$this->no_redis_groups = array_unique( array_merge( $this->no_redis_groups, $groups ) );
 		}
 
-		$this->_global_groups = array_flip( $this->global_groups );
+		$this->private_global_groups = array_flip( $this->global_groups );
 	}
 
 	/**
