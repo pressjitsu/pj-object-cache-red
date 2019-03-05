@@ -1,7 +1,12 @@
 <?php
 class Test_Object_Cache extends WP_UnitTestCase {
+	private $blog_prefix;
+
 	public function setUp() {
 		global $wp_object_cache;
+
+		$this->blog_prefix = is_multisite() ? get_current_blog_id() . ':' : '';
+
 		$wp_object_cache = new WP_Object_Cache( $this->redis_spy = new Redis_Spy() );
 		wp_cache_flush();
 	}
@@ -84,10 +89,10 @@ class Test_Object_Cache extends WP_UnitTestCase {
 
 		$this->assertEquals( array(
 			'group2' => array(
-				'hit' => '2',
+				$this->blog_prefix . 'hit' => '2',
 			),
 			'default' => array(
-				'hit' => '1',
+				$this->blog_prefix . 'hit' => '1',
 			)
 		), $result );
 
@@ -126,10 +131,10 @@ class Test_Object_Cache extends WP_UnitTestCase {
 
 		$this->assertEquals( array(
 			'group2' => array(
-				'hit' => '2',
+				$this->blog_prefix . 'hit' => '2',
 			),
 			'default' => array(
-				'hit' => '1',
+				$this->blog_prefix . 'hit' => '1',
 			)
 		), $result );
 
@@ -294,7 +299,7 @@ class Test_Object_Cache extends WP_UnitTestCase {
 		$this->assertEquals( -1, wp_cache_get( 'decr', 'this' ) );
 		$this->assertEquals( array(
 			'this' => array(
-				'hit' => '1',
+				$this->blog_prefix . 'hit' => '1',
 			)
 		), wp_cache_get_multi( array( 'this' => array( 'hit' ) ) ) );
 
@@ -315,6 +320,10 @@ class Test_Object_Cache extends WP_UnitTestCase {
 
 	public function test_multisite() {
 		global $wp_object_cache;
+
+		if ( ! is_multisite() ) {
+			$this->markTestSkipped( 'Test only runs on Multisite' );
+		}
 
 		wp_cache_add_global_groups( 'global' );
 
@@ -358,6 +367,10 @@ class Test_Object_Cache extends WP_UnitTestCase {
 
 	public function test_multisite_preloads() {
 		global $wp_object_cache;
+
+		if ( ! is_multisite() ) {
+			$this->markTestSkipped( 'Test only runs on Multisite' );
+		}
 
 		wp_cache_add_global_groups( 'global' );
 
@@ -408,7 +421,7 @@ class Test_Object_Cache extends WP_UnitTestCase {
 		wp_cache_incr( 'incr' );
 		wp_cache_get( 'incr' );
 
-		wp_cache_incr( 'decr' );
+		wp_cache_decr( 'decr' );
 		wp_cache_get( 'decr' );
 
 		$wp_object_cache->save_preloads( 'hash' );

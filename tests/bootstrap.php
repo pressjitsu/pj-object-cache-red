@@ -2,7 +2,7 @@
 ini_set( 'display_errors', 'on' );
 error_reporting( E_ALL );
 
-// Always be Multisiting
+// Always be Multisiting.
 define( 'MULTISITE', true );
 
 $_wp_tests_dir = getenv( 'WP_TESTS_DIR' ) ? : '/tmp/wordpress-tests-lib';
@@ -12,7 +12,12 @@ require_once $_pj_ocr_tests_dir . '/../object-cache.php';
 require_once $_pj_ocr_tests_dir . '/redis-spy.php';
 
 global $wp_object_cache;
-$wp_object_cache = new class {
+$wp_object_cache = new Test_WP_Object_Cache_Stub();
+
+/**
+ * Class Test_WP_Object_Cache_Stub
+ */
+class Test_WP_Object_Cache_Stub {
 	/**
 	 * A minimal sub cache implementation to launch Multisite.
 	 */
@@ -38,8 +43,14 @@ tests_add_filter( 'muplugins_loaded', function() use ( $_pj_ocr_tests_dir ) {
 register_shutdown_function( function() {
 	global $wpdb;
 	$wpdb->query( "SET foreign_key_checks = 0" );
-	foreach ( get_sites() as $site ) {
-		switch_to_blog( $site->blog_id );
+	if ( is_multisite() ) {
+		foreach ( get_sites() as $site ) {
+			switch_to_blog( $site->blog_id );
+			foreach ( $wpdb->tables() as $table => $prefixed_table ) {
+				$wpdb->query( "DROP TABLE IF EXISTS $prefixed_table" );
+			}
+		}
+	} else {
 		foreach ( $wpdb->tables() as $table => $prefixed_table ) {
 			$wpdb->query( "DROP TABLE IF EXISTS $prefixed_table" );
 		}
