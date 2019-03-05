@@ -38,8 +38,14 @@ tests_add_filter( 'muplugins_loaded', function() use ( $_pj_ocr_tests_dir ) {
 register_shutdown_function( function() {
 	global $wpdb;
 	$wpdb->query( "SET foreign_key_checks = 0" );
-	foreach ( get_sites() as $site ) {
-		switch_to_blog( $site->blog_id );
+	if ( is_multisite() ) {
+		foreach ( get_sites() as $site ) {
+			switch_to_blog( $site->blog_id );
+			foreach ( $wpdb->tables() as $table => $prefixed_table ) {
+				$wpdb->query( "DROP TABLE IF EXISTS $prefixed_table" );
+			}
+		}
+	} else {
 		foreach ( $wpdb->tables() as $table => $prefixed_table ) {
 			$wpdb->query( "DROP TABLE IF EXISTS $prefixed_table" );
 		}
