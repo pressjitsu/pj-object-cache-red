@@ -561,7 +561,7 @@ class WP_Object_Cache {
 
 			if ( isset( $this->to_unserialize[ $redis_key ] ) ) {
 				unset( $this->to_unserialize[ $redis_key ] );
-				$value = unserialize( $value );
+				$value                         = maybe_unserialize( $value );
 				$this->cache[ $group ][ $key ] = $value;
 			}
 
