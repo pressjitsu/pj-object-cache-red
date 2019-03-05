@@ -5,11 +5,6 @@
  * Version:     1.0
  */
 
-// Check if Redis class is installed
-if ( ! class_exists( 'Redis' ) ) {
-	return;
-}
-
 /**
  * Adds a value to cache.
  *
@@ -321,6 +316,12 @@ class WP_Object_Cache {
 	 * @param   null $persistent_id      To create an instance that persists between requests, use persistent_id to specify a unique ID for the instance.
 	 */
 	public function __construct( $redis_instance = null ) {
+		// Check if Redis class is installed.
+		if ( ! class_exists( 'Redis' ) ) {
+			$this->mark_redis_disconnected();
+			return;
+		}
+
 		// General Redis settings
 		$redis = array(
 			'host' => '127.0.0.1',
@@ -359,9 +360,7 @@ class WP_Object_Cache {
 
 			$this->redis_connected = true;
 		} catch ( RedisException $e ) {
-			// When Redis is unavailable, fall back to the internal back by forcing all groups to be "no redis" groups
-			$this->no_redis_groups = array_unique( array_merge( $this->no_redis_groups, $this->global_groups ) );
-			$this->redis_connected = false;
+			$this->mark_redis_disconnected();
 		}
 
 		/**
@@ -377,6 +376,12 @@ class WP_Object_Cache {
 		$this->_global_groups = array_flip( $this->global_groups );
 
 		$this->maybe_preload();
+	}
+
+	protected function mark_redis_disconnected() {
+		// When Redis is unavailable, fall back to the internal back by forcing all groups to be "no redis" groups
+		$this->no_redis_groups = array_unique( array_merge( $this->no_redis_groups, $this->global_groups ) );
+		$this->redis_connected = false;
 	}
 
 	public function maybe_preload() {
