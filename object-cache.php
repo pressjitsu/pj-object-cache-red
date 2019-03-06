@@ -411,12 +411,6 @@ class WP_Object_Cache {
 	 * @param object $redis_instance To create an instance that persists between requests, use Redis instance.
 	 */
 	public function __construct( $redis_instance = null ) {
-		// Check if Redis class is installed.
-		if ( ! class_exists( 'Redis' ) ) {
-			$this->mark_redis_disconnected();
-
-			return;
-		}
 
 		// General Redis settings.
 		$redis = array(
@@ -437,25 +431,30 @@ class WP_Object_Cache {
 			$redis['database'] = WP_REDIS_BACKEND_DB;
 		}
 
-		// Use Redis PECL library.
-		try {
-			if ( is_null( $redis_instance ) ) {
-				$redis_instance = new Redis();
-			}
-			$this->redis = $redis_instance;
-			$this->redis->connect( $redis['host'], $redis['port'] );
-			$this->redis->setOption( Redis::OPT_SERIALIZER, Redis::SERIALIZER_NONE );
+		// Check if Redis class is installed.
+		if ( class_exists( 'Redis' ) ) {
+			// Use Redis PECL library.
+			try {
+				if ( is_null( $redis_instance ) ) {
+					$redis_instance = new Redis();
+				}
+				$this->redis = $redis_instance;
+				$this->redis->connect( $redis['host'], $redis['port'] );
+				$this->redis->setOption( Redis::OPT_SERIALIZER, Redis::SERIALIZER_NONE );
 
-			if ( isset( $redis['auth'] ) ) {
-				$this->redis->auth( $redis['auth'] );
-			}
+				if ( isset( $redis['auth'] ) ) {
+					$this->redis->auth( $redis['auth'] );
+				}
 
-			if ( isset( $redis['database'] ) ) {
-				$this->redis->select( $redis['database'] );
-			}
+				if ( isset( $redis['database'] ) ) {
+					$this->redis->select( $redis['database'] );
+				}
 
-			$this->redis_connected = true;
-		} catch ( RedisException $e ) {
+				$this->redis_connected = true;
+			} catch ( RedisException $e ) {
+				$this->mark_redis_disconnected();
+			}
+		} else {
 			$this->mark_redis_disconnected();
 		}
 
