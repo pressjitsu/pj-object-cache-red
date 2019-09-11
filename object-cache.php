@@ -517,7 +517,7 @@ class WP_Object_Cache {
 		unset( $this->to_preload[ $group ][ $key ] );
 		unset( $this->to_unserialize[ $redis_key ] );
 
-		return (bool) $this->redis->delete( $redis_key );
+		return (bool) $this->redis->del( $redis_key );
 	}
 
 	/**
