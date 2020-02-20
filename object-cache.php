@@ -212,7 +212,8 @@ function wp_cache_add_global_groups( $groups ) {
  * @param string|array $groups A group or an array of groups to add.
  */
 function wp_cache_add_non_persistent_groups( $groups ) {
-	// Default cache doesn't persist so nothing to do here.
+	global $wp_object_cache;
+	$wp_object_cache->add_non_persistent_groups( $groups );
 }
 
 class WP_Object_Cache {
