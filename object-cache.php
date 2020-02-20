@@ -1,8 +1,8 @@
 <?php
 /**
  * Plugin Name: Pressjitsu Redis Object Cache
- * Author:      Pressjitsu, Inc., Eric Mann & Erick Hitter
- * Version:     1.0
+ * Author:      Pressjitsu, Inc., Matthew Sigley, Eric Mann, & Erick Hitter
+ * Version:     2.0
  */
 
 // Check if Redis class is installed
@@ -108,26 +108,6 @@ function wp_cache_get( $key, $group = 'default', $force = false, &$found = null 
 }
 
 /**
- * Retrieve multiple values from cache.
- *
- * Gets multiple values from cache, including across multiple groups
- *
- * Usage: array( 'group0' => array( 'key0', 'key1', 'key2', ), 'group1' => array( 'key0' ) )
- *
- * Mirrors the Memcached Object Cache plugin's argument and return-value formats
- *
- * @param   array       $groups  Array of groups and keys to retrieve
- *
- * @global WP_Object_Cache $wp_object_cache
- *
- * @return  bool|mixed           Array of cached values, keys in the format $group:$key. Non-existent keys false
- */
-function wp_cache_get_multi( $groups, $unserialize = true ) {
-	global $wp_object_cache;
-	return $wp_object_cache->get_multi( $groups, $unserialize );
-}
-
-/**
  * Increment a numeric item's value.
  *
  * @param string $key    The key under which to store the value.
@@ -225,21 +205,67 @@ function wp_cache_add_global_groups( $groups ) {
 }
 
 /**
- * Adds a group or set of groups to the list of non-Redis groups.
+ * Adds a group or set of groups to the list of non-persistent groups.
  *
- * @param   string|array $groups     A group or an array of groups to add.
+ * @since 2.6.0
  *
- * @global WP_Object_Cache $wp_object_cache
- *
- * @return  void
+ * @param string|array $groups A group or an array of groups to add.
  */
 function wp_cache_add_non_persistent_groups( $groups ) {
-	global $wp_object_cache;
-	$wp_object_cache->add_non_persistent_groups( $groups );
+	// Default cache doesn't persist so nothing to do here.
 }
 
 class WP_Object_Cache {
+	// Core properties from /wp-includes/class-wp-object-cache.php
+	/**
+	 * Holds the cached objects.
+	 *
+	 * @since 2.0.0
+	 * @var array
+	 */
+	private $cache = array();
 
+	/**
+	 * The amount of times the cache data was already stored in the cache.
+	 *
+	 * @since 2.5.0
+	 * @var int
+	 */
+	public $cache_hits = 0;
+
+	/**
+	 * Amount of times the cache did not have the request in cache.
+	 *
+	 * @since 2.0.0
+	 * @var int
+	 */
+	public $cache_misses = 0;
+
+	/**
+	 * List of global cache groups.
+	 *
+	 * @since 3.0.0
+	 * @var array
+	 */
+	protected $global_groups = array();
+
+	/**
+	 * The blog prefix to prepend to keys in non-global groups.
+	 *
+	 * @since 3.5.0
+	 * @var string
+	 */
+	private $blog_prefix;
+
+	/**
+	 * Holds the value of is_multisite().
+	 *
+	 * @since 3.5.0
+	 * @var bool
+	 */
+	private $multisite;
+
+	// Implementation specific properties
 	/**
 	 * Holds the Redis client.
 	 *
@@ -255,70 +281,17 @@ class WP_Object_Cache {
 	private $redis_connected = false;
 
 	/**
-	 * Local cache
+	 * List of global cache groups.
 	 *
+	 * @since 3.0.0
 	 * @var array
 	 */
-	public $cache = array();
-
-	private $to_unserialize = array();
-
-	public $to_preload = array();
-
-	/**
-	 * List of global groups.
-	 *
-	 * @var array
-	 */
-	public $global_groups = array( 'users', 'userlogins', 'usermeta', 'site-options', 'site-lookup', 'blog-lookup', 'blog-details', 'rss' );
-
-	private $_global_groups;
-
-	/**
-	 * List of groups not saved to Redis.
-	 *
-	 * @var array
-	 */
-	public $no_redis_groups = array( 'comment', 'counts' );
-
-	/**
-	 * Prefix used for global groups.
-	 *
-	 * @var string
-	 */
-	public $global_prefix = '';
-
-	/**
-	 * Prefix used for non-global groups.
-	 *
-	 * @var string
-	 */
-	public $blog_prefix = '';
-
-	/**
-	 * Track how many requests were found in cache
-	 *
-	 * @var int
-	 */
-	public $cache_hits = 0;
-
-	/**
-	 * Track how may requests were not cached
-	 *
-	 * @var int
-	 */
-	public $cache_misses = 0;
-
-	private $multisite;
-
-	public $stats = array();
+	protected $non_persistent_groups = array();
 
 	/**
 	 * Instantiate the Redis class.
 	 *
-	 * Instantiates the Redis class.
-	 *
-	 * @param   null $persistent_id      To create an instance that persists between requests, use persistent_id to specify a unique ID for the instance.
+	 * @param   null $redis_instance
 	 */
 	public function __construct( $redis_instance = null ) {
 		// General Redis settings
@@ -340,6 +313,17 @@ class WP_Object_Cache {
 			$redis['database'] = WP_REDIS_BACKEND_DB;
 		}
 
+		/**
+		 * This approach is borrowed from Sivel and Boren. Use the salt for easy cache invalidation and for
+		 * multi single WP installs on the same server.
+		 * Note this approach works but makes most memory analysis tools useless. 
+		 * Best practice should be to define 'WP_CACHE_KEY_SALT' as an empty string and set each site to use its own database in Redis if possible.
+		 */
+		if ( ! defined( 'WP_CACHE_KEY_SALT' ) ) {
+			define( 'WP_CACHE_KEY_SALT', hash('crc32b', ABSPATH ) ); // Use crc32b to shorten key size
+		}
+
+
 		// Use Redis PECL library.
 		try {
 			if ( is_null( $redis_instance ) ) {
@@ -348,6 +332,7 @@ class WP_Object_Cache {
 			$this->redis = $redis_instance;
 			$this->redis->connect( $redis['host'], $redis['port'] );
 			$this->redis->setOption( Redis::OPT_SERIALIZER, Redis::SERIALIZER_NONE );
+			$this->redis->setOption(Redis::OPT_PREFIX, WP_CACHE_KEY_SALT . ':');
 
 			if ( isset( $redis['auth'] ) ) {
 				$this->redis->auth( $redis['auth'] );
@@ -359,441 +344,422 @@ class WP_Object_Cache {
 
 			$this->redis_connected = true;
 		} catch ( RedisException $e ) {
-			// When Redis is unavailable, fall back to the internal back by forcing all groups to be "no redis" groups
-			$this->no_redis_groups = array_unique( array_merge( $this->no_redis_groups, $this->global_groups ) );
 			$this->redis_connected = false;
-		}
-
-		/**
-		 * This approach is borrowed from Sivel and Boren. Use the salt for easy cache invalidation and for
-		 * multi single WP installs on the same server.
-		 */
-		if ( ! defined( 'WP_CACHE_KEY_SALT' ) ) {
-			define( 'WP_CACHE_KEY_SALT', '' );
 		}
 
 		$this->multisite = is_multisite();
 		$this->blog_prefix = $this->multisite ? get_current_blog_id() . ':' : '';
-		$this->_global_groups = array_flip( $this->global_groups );
-
-		$this->maybe_preload();
-	}
-
-	public function maybe_preload() {
-		if ( ! $this->can_redis() || empty( $_SERVER['REQUEST_URI'] ) ) {
-			return;
-		}
-
-		if ( defined( 'WP_CLI' ) && WP_CLI ) {
-			return;
-		}
-
-		$request_hash = md5( json_encode( array(
-			$_SERVER['HTTP_HOST'],
-			$_SERVER['REQUEST_URI'],
-		) ) );
-
-		$this->preload( $request_hash );
-
-		if ( defined( 'DOING_TESTS' ) && DOING_TESTS ) {
-			return $request_hash;
-		}
-
-		register_shutdown_function( array( $this, 'save_preloads' ), $request_hash );
-	}
-
-	public function preload( $hash ) {
-		$keys = $this->get( $hash, 'pj-preload' );
-		if ( is_array( $keys ) ) {
-			$this->get_multi( $keys, false );
-		}
-	}
-
-	public function save_preloads( $hash ) {
-		$keys = array();
-
-		foreach ( $this->to_preload as $group => $_keys ) {
-			if ( $group === 'pj-preload' ) {
-				continue;
-			}
-
-			if ( in_array( $group, $this->no_redis_groups ) ) {
-				continue;
-			}
-
-			$_keys = array_keys( $_keys );
-			$keys[ $group ] = $_keys;
-		}
-
-		$this->set( $hash, $keys, 'pj-preload' );
 	}
 
 	/**
-	 * Is Redis available?
+	 * Is Redis available and is this group persistent?
 	 *
 	 * @return bool
 	 */
-	protected function can_redis() {
+	protected function can_redis( $group = '' ) {
+		if( !empty( $group ) && isset( $this->non_persistent_groups[ $group ] ) )
+			false;
+
 		return $this->redis_connected;
 	}
 
 	/**
-	 * Adds a value to cache.
+	 * Makes private properties readable for backward compatibility.
 	 *
-	 * If the specified key already exists, the value is not stored and the function
-	 * returns false.
+	 * @since 4.0.0
 	 *
-	 * @param   string $key            The key under which to store the value.
-	 * @param   mixed  $value          The value to store.
-	 * @param   string $group          The group value appended to the $key.
-	 * @param   int    $expiration     The expiration time, defaults to 0.
-	 * @return  bool                   Returns TRUE on success or FALSE on failure.
+	 * @param string $name Property to get.
+	 * @return mixed Property.
 	 */
-	public function add( $_key, $value, $group, $expiration = 0 ) {
+	public function __get( $name ) {
+		return $this->$name;
+	}
+
+	/**
+	 * Makes private properties settable for backward compatibility.
+	 *
+	 * @since 4.0.0
+	 *
+	 * @param string $name  Property to set.
+	 * @param mixed  $value Property value.
+	 * @return mixed Newly-set property.
+	 */
+	public function __set( $name, $value ) {
+		return $this->$name = $value;
+	}
+
+	/**
+	 * Makes private properties checkable for backward compatibility.
+	 *
+	 * @since 4.0.0
+	 *
+	 * @param string $name Property to check if set.
+	 * @return bool Whether the property is set.
+	 */
+	public function __isset( $name ) {
+		return isset( $this->$name );
+	}
+
+	/**
+	 * Makes private properties un-settable for backward compatibility.
+	 *
+	 * @since 4.0.0
+	 *
+	 * @param string $name Property to unset.
+	 */
+	public function __unset( $name ) {
+		unset( $this->$name );
+	}
+
+	/**
+	 * Adds data to the cache if it doesn't already exist.
+	 *
+	 * @since 2.0.0
+	 *
+	 * @uses WP_Object_Cache::_exists() Checks to see if the cache already has data.
+	 * @uses WP_Object_Cache::set()     Sets the data after the checking the cache
+	 *                                  contents existence.
+	 *
+	 * @param int|string $key    What to call the contents in the cache.
+	 * @param mixed      $data   The contents to store in the cache.
+	 * @param string     $group  Optional. Where to group the cache contents. Default 'default'.
+	 * @param int        $expire Optional. When to expire the cache contents. Default 0 (no expiration).
+	 * @return bool True on success, false if cache key and group already exist.
+	 */
+	public function add( $key, $data, $group = 'default', $expire = 0 ) {
 		if ( wp_suspend_cache_addition() ) {
 			return false;
 		}
 
-		list( $key, $redis_key ) = $this->build_key( $_key, $group );
+		if ( empty( $group ) ) {
+			$group = 'default';
+		}
 
-		if ( isset( $this->cache[ $group ], $this->cache[ $group ][ $key ] ) && false !== $this->cache[ $group ][ $key ] ) {
+		$id = $key;
+		if ( $this->multisite && ! isset( $this->global_groups[ $group ] ) ) {
+			$id = $this->blog_prefix . $key;
+		}
+
+		if ( $this->_exists( $id, $group ) ) {
 			return false;
 		}
 
-		return $this->set( $_key, $value, $group, $expiration );
+		return $this->set( $key, $data, $group, (int) $expire );
 	}
 
 	/**
-	 * Replace a value in the cache.
+	 * Sets the list of global cache groups.
 	 *
-	 * If the specified key doesn't exist, the value is not stored and the function
-	 * returns false.
-	 *
-	 * @param   string $key            The key under which to store the value.
-	 * @param   mixed  $value          The value to store.
-	 * @param   string $group          The group value appended to the $key.
-	 * @param   int    $expiration     The expiration time, defaults to 0.
-	 * @return  bool                   Returns TRUE on success or FALSE on failure.
-	 */
-	public function replace( $_key, $value, $group, $expiration = 0 ) {
-		list( $key, $redis_key ) = $this->build_key( $_key, $group );
-
-		// If group is a non-Redis group, save to internal cache, not Redis
-		if ( in_array( $group, $this->no_redis_groups ) || ! $this->can_redis() ) {
-			if ( ! isset( $this->cache[ $group ], $this->cache[ $group ][ $key ] ) ) {
-				return false;
-			}
-		} else {
-			if ( ! $this->redis->exists( $redis_key ) ) {
-				return false;
-			}
-		}
-
-		return $this->set( $_key, $value, $group, $expiration );
-	}
-
-	/**
-	 * Remove the item from the cache.
-	 *
-	 * @param   string $key        The key under which to store the value.
-	 * @param   string $group      The group value appended to the $key.
-	 * @return  bool               Returns TRUE on success or FALSE on failure.
-	 */
-	public function delete( $_key, $group ) {
-		list( $key, $redis_key ) = $this->build_key( $_key, $group );
-
-		if ( in_array( $group, $this->no_redis_groups ) || ! $this->can_redis() ) {
-			if ( ! isset( $this->cache[ $group ], $this->cache[ $group ][ $key ] ) ) {
-				return false;
-			}
-
-			unset( $this->cache[ $group ][ $key ] );
-			unset( $this->to_preload[ $group ][ $key ] );
-			unset( $this->to_unserialize[ $redis_key ] );
-			return true;
-		}
-
-		unset( $this->cache[ $group ][ $key ] );
-		unset( $this->to_preload[ $group ][ $key ] );
-		unset( $this->to_unserialize[ $redis_key ] );
-
-		return (bool) $this->redis->del( $redis_key );
-	}
-
-	/**
-	 * Invalidate all items in the cache.
-	 *
-	 * @return  bool
-	 */
-	public function flush() {
-		$this->cache = array();
-		$this->to_preload = array();
-		$this->to_unserialize = array();
-
-		if ( $this->can_redis() ) {
-			$this->redis->flushDb();
-		}
-
-		return true;
-	}
-
-	/**
-	 * Retrieve object from cache.
-	 *
-	 * Gets an object from cache based on $key and $group.
-	 *
-	 * @param   string        $key        The key under which to store the value.
-	 * @param   string        $group      The group value appended to the $key.
-	 * @return  bool|mixed                Cached object value.
-	 */
-	public function get( $_key, $group = 'default', $force = false, &$found = null ) {
-		list( $key, $redis_key ) = $this->build_key( $_key, $group );
-
-		$this->to_preload[ $group ][ $_key ] = true;
-
-		if ( ! $force && isset( $this->cache[ $group ][ $key ] ) ) {
-			$value = $this->cache[ $group ][ $key ];
-
-			if ( isset( $this->to_unserialize[ $redis_key ] ) ) {
-				unset( $this->to_unserialize[ $redis_key ] );
-				$value = unserialize( $value );
-				$this->cache[ $group ][ $key ] = $value;
-			}
-			
-      $found = true;
-			$this->cache_hits += 1;
-
-			return is_object( $value ) ? clone $value : $value;
-		}
-
-		if ( in_array( $group, $this->no_redis_groups ) || ! $this->can_redis() ) {
-      $found = false;
-			$this->cache_misses += 1;
-			return false;
-		}
-
-		// Fetch from Redis
-		$value = $this->redis->get( $redis_key );
-
-		if ( ! is_string( $value ) ) {
-      $found = false;
-			$this->cache[ $group ][ $key ] = false;
-			$this->cache_misses += 1;
-			return false;
-		}
-
-    $found = true;
-		$value = is_numeric( $value ) ? $value : unserialize( $value );
-		$this->cache[ $group ][ $key ] = $value;
-		$this->cache_hits += 1;
-		return $value;
-	}
-
-	/**
-	 * Retrieve multiple values from cache.
-	 *
-	 * Gets multiple values from cache, including across multiple groups
-	 *
-	 * Usage: array( 'group0' => array( 'key0', 'key1', 'key2', ), 'group1' => array( 'key0' ) )
-	 *
-	 * @param   array                           $groups  Array of groups and keys to retrieve
-	 * @return  bool|mixed                               Array of cached values, keys in the format $group:$key. Non-existent keys null.
-	 */
-	public function get_multi( $groups, $unserialize = true ) {
-		if ( empty( $groups ) || ! is_array( $groups ) ) {
-			return false;
-		}
-
-		// Retrieve requested caches and reformat results to mimic Memcached Object Cache's output
-		$cache = array();
-		$fetch_keys = array();
-		$map = array();
-
-		foreach ( $groups as $group => $keys ) {
-			if ( in_array( $group, $this->no_redis_groups ) || ! $this->can_redis() ) {
-				foreach ( $keys as $_key ) {
-					list( $key, $redis_key ) = $this->build_key( $_key, $group );
-					$cache[ $group ][ $key ] = $this->get( $_key, $group );
-				}
-
-				continue;
-			}
-
-			if ( empty( $cache[ $group ] ) ) {
-				$cache[ $group ] = array();
-			}
-
-			foreach ( $keys as $_key ) {
-				list( $key, $redis_key ) = $this->build_key( $_key, $group );
-
-				if ( isset( $this->cache[ $group ][ $key ] ) ) {
-					$cache[ $group ][ $key ] = $this->cache[ $group ][ $key ];
-					continue;
-				}
-
-				// Fetch these from Redis
-				$map[ $redis_key ] = array( $group, $key );
-				$fetch_keys[] = $redis_key;
-			}
-		}
-
-		// Nothing else to fetch
-		if ( empty( $fetch_keys ) ) {
-			return $cache;
-		}
-
-		$results = $this->redis->mget( $fetch_keys );
-		foreach( array_combine( $fetch_keys, $results ) as $redis_key => $value ) {
-			list( $group, $key ) = $map[ $redis_key ];
-
-			if ( is_string( $value ) ) {
-				if ( ! $unserialize && ! is_numeric( $value ) ) {
-					$this->to_unserialize[ $redis_key ] = true;
-				} elseif ( $unserialize ) {
-					$this->to_preload[ $group ][ $key ] = true;
-					$value = is_numeric( $value ) ? $value : unserialize( $value );
-				}
-			} else {
-				$value = false;
-			}
-
-			$this->cache[ $group ][ $key ] = $cache[ $group ][ $key ] = $value;
-		}
-
-		return $cache;
-	}
-
-	/**
-	 * Sets a value in cache.
-	 *
-	 * The value is set whether or not this key already exists in Redis.
-	 *
-	 * @param   string $key        The key under which to store the value.
-	 * @param   mixed  $value      The value to store.
-	 * @param   string $group      The group value appended to the $key.
-	 * @param   int    $expiration The expiration time, defaults to 0.
-	 * @return  bool               Returns TRUE on success or FALSE on failure.
-	 */
-	public function set( $_key, $value, $group = 'default', $expiration = 0 ) {
-		list( $key, $redis_key ) = $this->build_key( $_key, $group );
-
-		if ( is_object( $value ) ) {
-			$value = clone $value;
-		}
-
-		$this->cache[ $group ][ $key ] = $value;
-
-		if ( in_array( $group, $this->no_redis_groups ) || ! $this->can_redis() ) {
-			return true;
-		}
-		
-		$value = is_numeric( $value ) ? $value : serialize( $value );
-
-		// Save to Redis
-		if ( $expiration ) {
-			$this->redis->setex( $redis_key, $expiration, $value );
-		} else {
-			$this->redis->set( $redis_key, $value );
-		}
-
-		return true;
-	}
-
-	/**
-	 * Increment a Redis counter by the amount specified
-	 *
-	 * @param  string $key
-	 * @param  int    $offset
-	 * @param  string $group
-	 * @return bool
-	 */
-	public function incr( $_key, $offset = 1, $group ) {
-		list( $key, $redis_key ) = $this->build_key( $_key, $group );
-
-		if ( in_array( $group, $this->no_redis_groups ) || ! $this->can_redis() ) {
-			// Consistent with the Redis behavior (start from 0 if not exists)
-			if ( ! isset( $this->cache[ $group ][ $key ] ) ) {
-				$this->cache[ $group ][ $key ] = 0;
-			}
-
-			$this->cache[ $group ][ $key ] += $offset;
-			return true;
-		}
-
-		// Save to Redis
-		$value = $this->redis->incrBy( $redis_key, $offset );
-		$this->cache[ $group ][ $key ] = $value;
-		return $value;
-	}
-
-	/**
-	 * Decrement a Redis counter by the amount specified
-	 *
-	 * @param  string $key
-	 * @param  int    $offset
-	 * @param  string $group
-	 * @return bool
-	 */
-	public function decr( $key, $offset = 1, $group = 'default' ) {
-		return $this->incr( $key, $offset * -1, $group );
-	}
-
-	/**
-	 * Builds a key for the cached object using the blog_id, key, and group values.
-	 *
-	 * @author  Ryan Boren   This function is inspired by the original WP Memcached Object cache.
-	 * @link    http://wordpress.org/extend/plugins/memcached/
-	 *
-	 * @param   string $key        The key under which to store the value.
-	 * @param   string $group      The group value appended to the $key.
-	 *
-	 * @return  array
-	 */
-	public function build_key( $key, $group = 'default' ) {
-		$prefix = '';
-		if ( ! isset( $this->_global_groups[ $group ] ) ) {
-			$prefix = $this->blog_prefix;
-		}
-
-		$local_key = $prefix . $key;
-		return array( $local_key, WP_CACHE_KEY_SALT . "$prefix$group:$key" );
-	}
-
-	/**
-	 * In multisite, switch blog prefix when switching blogs
-	 *
-	 * @param int $_blog_id
-	 * @return bool
-	 */
-	public function switch_to_blog( $blog_id ) {
-		$this->blog_prefix = $this->multisite ? $blog_id . ':' : '';
-	}
-
-	/**
-	 * Sets the list of global groups.
+	 * @since 3.0.0
 	 *
 	 * @param array $groups List of groups that are global.
 	 */
 	public function add_global_groups( $groups ) {
 		$groups = (array) $groups;
 
-		if ( $this->can_redis() ) {
-			$this->global_groups = array_unique( array_merge( $this->global_groups, $groups ) );
-		} else {
-			$this->no_redis_groups = array_unique( array_merge( $this->no_redis_groups, $groups ) );
-		}
-
-		$this->_global_groups = array_flip( $this->global_groups );
+		$groups              = array_fill_keys( $groups, true );
+		$this->global_groups = array_merge( $this->global_groups, $groups );
 	}
 
 	/**
-	 * Sets the list of groups not to be cached by Redis.
+	 * Sets the list of global cache groups.
 	 *
-	 * @param array $groups List of groups that are to be ignored.
+	 * @param array $groups List of groups that are global.
 	 */
 	public function add_non_persistent_groups( $groups ) {
 		$groups = (array) $groups;
 
-		$this->no_redis_groups = array_unique( array_merge( $this->no_redis_groups, $groups ) );
+		$groups              = array_fill_keys( $groups, true );
+		$this->non_persistent_groups = array_merge( $this->non_persistent_groups, $groups );
+	}
+
+	/**
+	 * Decrements numeric cache item's value.
+	 *
+	 * @since 3.3.0
+	 *
+	 * @param int|string $key    The cache key to decrement.
+	 * @param int        $offset Optional. The amount by which to decrement the item's value. Default 1.
+	 * @param string     $group  Optional. The group the key is in. Default 'default'.
+	 * @return int|false The item's new value on success, false on failure.
+	 */
+	public function decr( $key, $offset = 1, $group = 'default' ) {
+		return $this->incr( $key, $offset * -1, $group );
+	}
+
+	/**
+	 * Removes the contents of the cache key in the group.
+	 *
+	 * If the cache key does not exist in the group, then nothing will happen.
+	 *
+	 * @since 2.0.0
+	 *
+	 * @param int|string $key        What the contents in the cache are called.
+	 * @param string     $group      Optional. Where the cache contents are grouped. Default 'default'.
+	 * @param bool       $deprecated Optional. Unused. Default false.
+	 * @return bool False if the contents weren't deleted and true on success.
+	 */
+	public function delete( $key, $group = 'default', $deprecated = false ) {
+		if ( empty( $group ) ) {
+			$group = 'default';
+		}
+
+		if ( $this->multisite && ! isset( $this->global_groups[ $group ] ) ) {
+			$key = $this->blog_prefix . $key;
+		}
+
+		if ( ! $this->_exists( $key, $group ) ) {
+			return false;
+		}
+
+		unset( $this->cache[ $group ][ $key ] );
+
+		if( $this->can_redis( $group ) )
+			return (bool) $this->redis->del( "$group:$key" );
+		return true;
+	}
+
+	/**
+	 * Clears the object cache of all data.
+	 *
+	 * @since 2.0.0
+	 *
+	 * @return true Always returns true.
+	 */
+	public function flush() {
+		$this->cache = array();
+
+		if ( $this->can_redis() )
+			$this->redis->flushDb();
+
+		return true;
+	}
+
+	
+	/**
+	 * Retrieves the cache contents, if it exists.
+	 *
+	 * The contents will be first attempted to be retrieved by searching by the
+	 * key in the cache group. If the cache is hit (success) then the contents
+	 * are returned.
+	 *
+	 * On failure, the number of cache misses will be incremented.
+	 *
+	 * @since 2.0.0
+	 *
+	 * @param int|string $key    What the contents in the cache are called.
+	 * @param string     $group  Optional. Where the cache contents are grouped. Default 'default'.
+	 * @param bool       $force  Optional. Unused. Whether to force a refetch rather than relying on the local
+	 *                           cache. Default false.
+	 * @param bool       $found  Optional. Whether the key was found in the cache (passed by reference).
+	 *                           Disambiguates a return of false, a storable value. Default null.
+	 * @return mixed|false The cache contents on success, false on failure to retrieve contents.
+	 */
+	public function get( $key, $group = 'default', $force = false, &$found = null ) {
+		if ( empty( $group ) ) {
+			$group = 'default';
+		}
+
+		if ( $this->multisite && ! isset( $this->global_groups[ $group ] ) ) {
+			$key = $this->blog_prefix . $key;
+		}
+
+		if ( $this->_exists( $key, $group ) ) {
+			if ( ( $force || !isset( $this->cache[ $group ][ $key ] ) ) && $this->can_redis( $group ) ) {
+				$this->cache[ $group ][ $key ] = $this->redis->get( "$group:$key" );
+				$unserialized_value = @unserialize( $this->cache[ $group ][ $key ] );
+				if( false !== $unserialized_value )
+					$this->cache[ $group ][ $key ] = $unserialized_value;
+			}
+
+			if ( isset( $this->cache[ $group ][ $key ] ) ) {
+				$found             = true;
+				$this->cache_hits += 1;
+				if ( is_object( $this->cache[ $group ][ $key ] ) ) {
+					return clone $this->cache[ $group ][ $key ];
+				} else {
+					return $this->cache[ $group ][ $key ];
+				}
+			}
+		}
+
+		$found               = false;
+		$this->cache_misses += 1;
+		return false;
+	}
+
+	/**
+	 * Increments numeric cache item's value.
+	 * Don't use Redis::incrBy to emulate WP core's behavior
+	 *
+	 * @since 3.3.0
+	 *
+	 * @param int|string $key    The cache key to increment
+	 * @param int        $offset Optional. The amount by which to increment the item's value. Default 1.
+	 * @param string     $group  Optional. The group the key is in. Default 'default'.
+	 * @return int|false The item's new value on success, false on failure.
+	 */
+	public function incr( $key, $offset = 1, $group = 'default' ) {
+		if ( empty( $group ) ) {
+			$group = 'default';
+		}
+
+		if ( $this->multisite && ! isset( $this->global_groups[ $group ] ) ) {
+			$key = $this->blog_prefix . $key;
+		}
+
+		if ( ! $this->_exists( $key, $group ) ) {
+			return false;
+		}
+
+		if ( !isset( $this->cache[ $group ][ $key ] ) && $this->can_redis( $group ) )
+			$this->cache[ $group ][ $key ] = $this->redis->get( "$group:$key" );
+
+		if ( ! is_numeric( $this->cache[ $group ][ $key ] ) ) {
+			$this->cache[ $group ][ $key ] = 0;
+		}
+
+		$offset = (int) $offset;
+
+		$this->cache[ $group ][ $key ] += $offset;
+
+		if ( $this->cache[ $group ][ $key ] < 0 ) {
+			$this->cache[ $group ][ $key ] = 0;
+		}
+
+		if( $this->can_redis( $group ) ) {
+			$ttl = $this->redis->ttl( "$group:$key" );
+			if( $ttl >= 0 ) // -1 indicates the key has no ttl
+				$this->redis->set( "$group:$key", $this->cache[ $group ][ $key ], $ttl );
+			else
+				$this->redis->set( "$group:$key", $this->cache[ $group ][ $key ] );
+		}
+
+		return $this->cache[ $group ][ $key ];
+	}
+
+	/**
+	 * Replaces the contents in the cache, if contents already exist.
+	 *
+	 * @since 2.0.0
+	 *
+	 * @see WP_Object_Cache::set()
+	 *
+	 * @param int|string $key    What to call the contents in the cache.
+	 * @param mixed      $data   The contents to store in the cache.
+	 * @param string     $group  Optional. Where to group the cache contents. Default 'default'.
+	 * @param int        $expire Optional. When to expire the cache contents. Default 0 (no expiration).
+	 * @return bool False if not exists, true if contents were replaced.
+	 */
+	public function replace( $key, $data, $group = 'default', $expire = 0 ) {
+		if ( empty( $group ) ) {
+			$group = 'default';
+		}
+
+		$id = $key;
+		if ( $this->multisite && ! isset( $this->global_groups[ $group ] ) ) {
+			$id = $this->blog_prefix . $key;
+		}
+
+		if ( ! $this->_exists( $id, $group ) ) {
+			return false;
+		}
+
+		return $this->set( $key, $data, $group, (int) $expire );
+	}
+
+	/**
+	 * Sets the data contents into the cache.
+	 *
+	 * The cache contents are grouped by the $group parameter followed by the
+	 * $key. This allows for duplicate ids in unique groups. Therefore, naming of
+	 * the group should be used with care and should follow normal function
+	 * naming guidelines outside of core WordPress usage.
+	 *
+	 * The $expire parameter is not used, because the cache will automatically
+	 * expire for each time a page is accessed and PHP finishes. The method is
+	 * more for cache plugins which use files.
+	 *
+	 * @since 2.0.0
+	 *
+	 * @param int|string $key    What to call the contents in the cache.
+	 * @param mixed      $data   The contents to store in the cache.
+	 * @param string     $group  Optional. Where to group the cache contents. Default 'default'.
+	 * @param int        $expire Not Used.
+	 * @return true Always returns true.
+	 */
+	public function set( $key, $data, $group = 'default', $expire = 0 ) {
+		if ( empty( $group ) ) {
+			$group = 'default';
+		}
+
+		if ( $this->multisite && ! isset( $this->global_groups[ $group ] ) ) {
+			$key = $this->blog_prefix . $key;
+		}
+
+
+		if ( is_object( $data ) ) {
+			$data = clone $data;
+		}
+
+		$this->cache[ $group ][ $key ] = $data;
+
+		if( $this->can_redis( $group ) ) {
+			$serialized_value = serialize( $this->cache[ $group ][ $key ] );
+			if( $expire > 0 )
+				$this->redis->set( "$group:$key", $serialized_value, $expire  );
+			else
+				$this->redis->set( "$group:$key", $serialized_value );
+		}
+
+		return true;
+	}
+
+	/**
+	 * Echoes the stats of the caching.
+	 *
+	 * Gives the cache hits, and cache misses. Also prints every cached group,
+	 * key and the data.
+	 *
+	 * @since 2.0.0
+	 */
+	public function stats() {
+		echo '<p>';
+		echo "<strong>Cache Hits:</strong> {$this->cache_hits}<br />";
+		echo "<strong>Cache Misses:</strong> {$this->cache_misses}<br />";
+		echo '</p>';
+		echo '<ul>';
+		foreach ( $this->cache as $group => $cache ) {
+			echo "<li><strong>Group:</strong> $group - ( " . number_format( strlen( serialize( $cache ) ) / KB_IN_BYTES, 2 ) . 'k )</li>';
+		}
+		echo '</ul>';
+	}
+
+	/**
+	 * Switches the internal blog ID.
+	 *
+	 * This changes the blog ID used to create keys in blog specific groups.
+	 *
+	 * @since 3.5.0
+	 *
+	 * @param int $blog_id Blog ID.
+	 */
+	public function switch_to_blog( $blog_id ) {
+		$blog_id           = (int) $blog_id;
+		$this->blog_prefix = $this->multisite ? $blog_id . ':' : '';
+	}
+
+	/**
+	 * Serves as a utility function to determine whether a key exists in the cache.
+	 *
+	 * @since 3.4.0
+	 *
+	 * @param int|string $key   Cache key to check for existence.
+	 * @param string     $group Cache group for the key existence check.
+	 * @return bool Whether the key exists in the cache for the given group.
+	 */
+	protected function _exists( $key, $group ) {
+		return ( isset( $this->cache[ $group ] ) && ( isset( $this->cache[ $group ][ $key ] ) || array_key_exists( $key, $this->cache[ $group ] ) ) )
+			|| ( $this->can_redis( $group ) && $this->redis->exists( "$group:$key" ) );
 	}
 }
