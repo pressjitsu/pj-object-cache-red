@@ -365,6 +365,40 @@ class WP_Object_Cache {
 		return $this->redis_connected;
 	}
 
+
+	/**
+	 * Wrapper for Redis::set.
+	 * Handle object serialization and value compression.
+	 *
+	 * @return bool
+	 */
+	protected function set_redis( $key, $value, $expire = 0 ) {
+		$value = @serialize( $value );
+		$compressed_value = @gzcompress( $value, 1, FORCE_DEFLATE );
+		if( false !== $compressed_value )
+			$value = "@$compressed_value"; // @ is our compression marker. The leading character of a php serialized string is never @.
+		if( $expire > 0 )
+			$this->redis->set( $key, $value, $expire );
+		else
+			$this->redis->set( $key, $value );
+	}
+
+	/**
+	 * Wrapper for Redis::get.
+	 * Handle object unserialization and value decompression.
+	 *
+	 * @return bool
+	 */
+	protected function get_redis( $key ) {
+		$value = $this->redis->get( $key );
+		if( substr( $value, 0, 1 ) == '@' ) {
+			$decompressed_value = @gzuncompress( substr( $value, 1 ) );
+			if( false !== $decompressed_value )
+				$value = $decompressed_value;
+		}
+		return @unserialize( $value );
+	}
+
 	/**
 	 * Makes private properties readable for backward compatibility.
 	 *
@@ -567,12 +601,8 @@ class WP_Object_Cache {
 		}
 
 		if ( $this->_exists( $key, $group ) ) {
-			if ( ( $force || !isset( $this->cache[ $group ][ $key ] ) ) && $this->can_redis( $group ) ) {
-				$this->cache[ $group ][ $key ] = $this->redis->get( "$group:$key" );
-				$unserialized_value = @unserialize( $this->cache[ $group ][ $key ] );
-				if( false !== $unserialized_value )
-					$this->cache[ $group ][ $key ] = $unserialized_value;
-			}
+			if ( ( $force || !isset( $this->cache[ $group ][ $key ] ) ) && $this->can_redis( $group ) )
+				$this->cache[ $group ][ $key ] = $this->get_redis( "$group:$key" );
 
 			if ( isset( $this->cache[ $group ][ $key ] ) ) {
 				$found             = true;
@@ -615,7 +645,7 @@ class WP_Object_Cache {
 		}
 
 		if ( !isset( $this->cache[ $group ][ $key ] ) && $this->can_redis( $group ) )
-			$this->cache[ $group ][ $key ] = $this->redis->get( "$group:$key" );
+			$this->cache[ $group ][ $key ] = $this->get_redis( "$group:$key" );
 
 		if ( ! is_numeric( $this->cache[ $group ][ $key ] ) ) {
 			$this->cache[ $group ][ $key ] = 0;
@@ -631,10 +661,12 @@ class WP_Object_Cache {
 
 		if( $this->can_redis( $group ) ) {
 			$ttl = $this->redis->ttl( "$group:$key" );
-			if( $ttl >= 0 ) // -1 indicates the key has no ttl
-				$this->redis->set( "$group:$key", $this->cache[ $group ][ $key ], $ttl );
+			if( $ttl < 0 ) // -1 indicates the key has no ttl
+				$this->set_redis( "$group:$key", $this->cache[ $group ][ $key ] );
+			else if( $ttl == 0 )
+				$this->delete( $key, $group );
 			else
-				$this->redis->set( "$group:$key", $this->cache[ $group ][ $key ] );
+				$this->set_redis( "$group:$key", $this->cache[ $group ][ $key ], $ttl );
 		}
 
 		return $this->cache[ $group ][ $key ];
@@ -706,13 +738,8 @@ class WP_Object_Cache {
 
 		$this->cache[ $group ][ $key ] = $data;
 
-		if( $this->can_redis( $group ) ) {
-			$serialized_value = serialize( $this->cache[ $group ][ $key ] );
-			if( $expire > 0 )
-				$this->redis->set( "$group:$key", $serialized_value, $expire  );
-			else
-				$this->redis->set( "$group:$key", $serialized_value );
-		}
+		if( $this->can_redis( $group ) )
+			$this->set_redis( "$group:$key", $this->cache[ $group ][ $key ], $expire );
 
 		return true;
 	}
