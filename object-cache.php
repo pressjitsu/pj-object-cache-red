@@ -333,7 +333,8 @@ class WP_Object_Cache {
 			$this->redis = $redis_instance;
 			$this->redis->connect( $redis['host'], $redis['port'] );
 			$this->redis->setOption( Redis::OPT_SERIALIZER, Redis::SERIALIZER_NONE );
-			$this->redis->setOption(Redis::OPT_PREFIX, WP_CACHE_KEY_SALT . ':');
+			if( !empty( WP_CACHE_KEY_SALT ) )
+				$this->redis->setOption(Redis::OPT_PREFIX, WP_CACHE_KEY_SALT . ':');
 
 			if ( isset( $redis['auth'] ) ) {
 				$this->redis->auth( $redis['auth'] );
