@@ -560,14 +560,14 @@ class WP_Object_Cache {
 				$this->cache[ $group ][ $key ] = $value;
 			}
 			
-      $found = true;
+			$found = true;
 			$this->cache_hits += 1;
 
 			return is_object( $value ) ? clone $value : $value;
 		}
 
 		if ( in_array( $group, $this->no_redis_groups ) || ! $this->can_redis() ) {
-      $found = false;
+			$found = false;
 			$this->cache_misses += 1;
 			return false;
 		}
@@ -576,13 +576,14 @@ class WP_Object_Cache {
 		$value = $this->redis->get( $redis_key );
 
 		if ( ! is_string( $value ) ) {
-      $found = false;
+			$found = false;
 			$this->cache[ $group ][ $key ] = false;
 			$this->cache_misses += 1;
 			return false;
 		}
 
-    $found = true;
+		$found = true;
+
 		$value = is_numeric( $value ) ? $value : unserialize( $value );
 		$this->cache[ $group ][ $key ] = $value;
 		$this->cache_hits += 1;
