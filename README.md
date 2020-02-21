@@ -13,6 +13,7 @@ For more information check out https://pressjitsu.com/blog/redis-object-cache-wo
 ## Authors
 
 * Pressjitsu, Inc.
+* Gennady Kovshenin
 * Eric Mann
 * Erick Hitter
 

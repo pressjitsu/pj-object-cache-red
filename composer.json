@@ -1,0 +1,18 @@
+{
+	"name": "pressjitsu/pj-object-cache-red",
+	"type": "wordpress-plugin",
+	"description": "The fastest known WordPress Redis-based Object Cache.",
+	"keywords": ["object cache", "redis", "performance"],
+	"homepage": "https://pressjitsu.com/blog/redis-object-cache-wordpress/",
+	"license": "GPL-3.0+",
+
+	"require": {
+		"php": ">=5.3",
+		"ext-json": "*",
+		"ext-redis": "*"
+	},
+
+	"require-dev": {
+		"phpunit/phpunit": ">4.0 <7"
+	}
+}

@@ -1,8 +1,14 @@
 <?php
 /**
  * Plugin Name: Pressjitsu Redis Object Cache
- * Author:      Pressjitsu, Inc., Eric Mann & Erick Hitter
- * Version:     1.0
+ * Plugin URI:  https://github.com/pressjitsu/pj-object-cache-red
+ * Version:     1.1
+ * Author:      Pressjitsu, Inc.
+ * Author URI:  https://pressjitsu.com
+ * https://github.com/pressjitsu/pj-object-cache-red
+ * Description: A fork of the most popular implementation by Eric Mann & Erick Hitter but with a performance twist - preloading!
+ * License:     GPLv3
+ * License URI: https://www.gnu.org/licenses/quick-guide-gplv3.html
  */
 
 // Check if Redis class is installed
