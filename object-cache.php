@@ -11,17 +11,11 @@
  * License URI: https://www.gnu.org/licenses/quick-guide-gplv3.html
  */
 
-// Check if Redis class is installed
-if ( ! class_exists( 'Redis' ) ) {
-	return;
-}
-
-// Check if caching should be disabled.
-if ( defined( 'WP_REDIS_DISABLED' ) && WP_REDIS_DISABLED ) {
-	return;
-}
-
-if ( true ) : // Prevent functions and classes from being defined.
+/**
+ * Check if Redis class is installed and caching is not disabled.
+ * If false, prevent functions and classes from being defined.
+ */
+if ( class_exists( 'Redis' ) && ( ! defined( 'WP_REDIS_DISABLED' ) || ! WP_REDIS_DISABLED ) :
 
 /**
  * Adds a value to cache.
