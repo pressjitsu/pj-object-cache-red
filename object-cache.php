@@ -16,6 +16,11 @@ if ( ! class_exists( 'Redis' ) ) {
 	return;
 }
 
+// Check if caching should be disabled.
+if ( defined( 'WP_REDIS_DISABLED' ) && WP_REDIS_DISABLED ) {
+	return;
+}
+
 /**
  * Adds a value to cache.
  *
