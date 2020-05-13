@@ -21,6 +21,8 @@ if ( defined( 'WP_REDIS_DISABLED' ) && WP_REDIS_DISABLED ) {
 	return;
 }
 
+if ( true ) : // Prevent functions and classes from being defined.
+
 /**
  * Adds a value to cache.
  *
@@ -809,3 +811,5 @@ class WP_Object_Cache {
 		$this->no_redis_groups = array_unique( array_merge( $this->no_redis_groups, $groups ) );
 	}
 }
+
+endif;
