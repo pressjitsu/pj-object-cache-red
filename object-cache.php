@@ -15,7 +15,7 @@
  * Check if Redis class is installed and caching is not disabled.
  * If false, prevent functions and classes from being defined.
  */
-if ( class_exists( 'Redis' ) && ( ! defined( 'WP_REDIS_DISABLED' ) || ! WP_REDIS_DISABLED ) :
+if ( class_exists( 'Redis' ) && ( ! defined( 'WP_REDIS_DISABLED' ) || ! WP_REDIS_DISABLED ) ):
 
 /**
  * Adds a value to cache.
