@@ -2,7 +2,7 @@
 /**
  * Plugin Name: Pressjitsu Redis Object Cache
  * Plugin URI:  https://github.com/pressjitsu/pj-object-cache-red
- * Version:     1.1
+ * Version:     1.2
  * Author:      Pressjitsu, Inc.
  * Author URI:  https://pressjitsu.com
  * https://github.com/pressjitsu/pj-object-cache-red
